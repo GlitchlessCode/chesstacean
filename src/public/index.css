@@ -1,0 +1,11 @@
+body {
+    display: grid;
+    place-items: center;
+}
+
+#chessboard {
+    width: calc(100vh - 100vw / 5);
+    aspect-ratio: 1/1;
+
+    border: 2px solid red;
+}
