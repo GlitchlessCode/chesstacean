@@ -1,11 +1,56 @@
-body {
-    display: grid;
-    place-items: center;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap');
+
+:root {
+	--font-family: 'Inter', sans-serif;
+
+	--color-accent:        #FF582F;
+	--color-foreground:    #BFBFBF;
+	--color-midforeground: #666666;
+	--color-midbackground: #0D0D0D;
+	--color-background:    #000000;
 }
 
-#chessboard {
-    width: calc(100vh - 100vw / 5);
-    aspect-ratio: 1/1;
+body {
+	display: grid;
+	background-color: var(--color-background);
+}
 
-    border: 2px solid red;
+nav {
+	display: flex;
+	justify-content: space-between;
+
+	min-width: max-content;
+	padding: 64px;
+	user-select: none;
+}
+
+nav div.leftside {
+	font-size: 1rem;
+	font-family: var(--font-family);
+
+	color: var(--color-foreground);
+	cursor: pointer;
+}
+
+nav div.leftside img {
+	width: 32px;
+	aspect-ratio: 1/1;
+	margin-right: 16px;
+}
+
+nav div.rightside svg {
+	fill: var(--color-midforeground);
+	cursor: pointer;
+	margin-left: 16px;
+
+	transition-duration: .2s;
+	transition-property: all;
+}
+
+nav div.rightside svg:hover {
+	scale: 1.1;
+}
+
+nav div.rightside svg:active {
+	fill: var(--color-accent);
 }
