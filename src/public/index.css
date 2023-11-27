@@ -54,20 +54,27 @@ nav div.rght svg {
 }
 
 nav div.rght svg:hover {
-	scale: 1.1;
+	fill: var(--color-accent);
 }
 
 nav div.rght svg:active {
-	fill: var(--color-accent);
+	scale: .95;
 }
 
 main {
 	display: grid;
-	grid-template-columns: 2fr 1fr;
+	grid-template-areas:
+		'a a b'
+		'c c b';
 }
 
-main div.left {
+main div.topleft {
 	margin: 0 64px;
+	grid-area: a;
+}
+
+main div.bottomleft {
+	grid-area: b;
 }
 
 main div.head {
@@ -78,29 +85,79 @@ main div.head {
 	background-color: var(--color-midbackground);
 }
 
+main div.topleft div.card-container {
+	overflow-y: scroll;
+	margin-bottom: 64px;
+	white-space: nowrap;
+}
+
 main div.card {
-	color: var(--color-foreground);
+	font-size: 0.875rem;
 	font-family: var(--font-family);
 
 	padding: 10px;
+	margin-bottom: 8px;
+
+	gap: 10px;
+	display: grid;
+	align-items: center;
+	grid-template-columns: auto 1fr auto;
+
+	color: var(--color-foreground);
+	user-select: none;
 	border-radius: 20px;
 	background-color: var(--color-midbackground);
 }
 
+main div.card.inactive div.icon-container,
+main div.card.inactive div.info-container {
+	filter: brightness(50%);
+}
+
 main div.card div.icon-container {
+	width: min-content;
+	height: min-content;
 	padding: 10px;
-	margin-right: 20px;
 
-	display: grid;
-	place-items: center;
-
+	line-height: 0;
 	border-radius: 10px;
 	background-color: var(--color-background);
 }
 
-main div.card div.icon-container,
 main div.card div.info-container {
-	display: inline;
+	height: min-content;
+	margin-left: 10px;
+}
+
+main div.card div.info-container span {
+	font-weight: bold;
+}
+
+main div.card button {
+	font-size: 0.875rem;
+	font-weight: 900;
+	font-family: var(--font-family);
+
+	width: 80px;
+	height: 100%;
+
+	border-style: none;
+	border-radius: 10px;
+
+	transition-duration: .2s;
+	transition-property: all;
+
+	color: var(--color-foreground);
+	cursor: pointer;
+	background-color: var(--color-background);
+}
+
+main div.card button:hover {
+	color: var(--color-accent);
+}
+
+main div.card button:active {
+	scale: .95;
 }
 
 main div.card img {
