@@ -10,3 +10,4 @@ warp = "0.3.6"
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3.29"
 argon2 = "0.5.2"
+rusqlite = {version="0.30.0", features = ["bundled"]}

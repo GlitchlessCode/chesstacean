@@ -9,7 +9,10 @@ class UnwrapError extends Error {
   }
 }
 
-/** @template T */
+/**
+ * @template T
+ * @template {Result.Ok|Result.Err} U
+ */
 class Result {
   static Ok = Symbol("Ok");
   static Err = Symbol("Err");
@@ -19,7 +22,7 @@ class Result {
 
   /**
    * @param {T} T
-   * @param {Symbol} kind
+   * @param {U} kind
    */
   constructor(T, kind) {
     this.#data = [T];
