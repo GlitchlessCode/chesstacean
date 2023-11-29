@@ -9,6 +9,7 @@ class UnwrapError extends Error {
   }
 }
 
+/** @template T */
 class Result {
   static Ok = Symbol("Ok");
   static Err = Symbol("Err");
@@ -17,7 +18,6 @@ class Result {
   #kind;
 
   /**
-   * @template T
    * @param {T} T
    * @param {Symbol} kind
    */
@@ -40,7 +40,6 @@ class Result {
   }
 
   /**
-   * @template T
    * @returns {T}
    * @throws {UnwrapError}
    */
@@ -56,9 +55,7 @@ class Result {
   }
 
   /**
-   * @template E
-   * @template T
-   * @param {(error:E)=>T} callback
+   * @param {(error:T)=>T} callback
    * @returns {T}
    */
   unwrap_or_else(callback) {
