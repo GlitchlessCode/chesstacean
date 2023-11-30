@@ -89,4 +89,4 @@ function Err(T) {
   return new Result(T, Result.Err);
 }
 
-export { Ok, Err, Result };
+export { Ok, Err, Result, UnwrapError };
