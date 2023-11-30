@@ -1,9 +1,33 @@
-Creates (Packages) to use:
-warp (https://github.com/seanmonstar/warp)
+Crates (Packages) to use:
+[warp] (https://github.com/seanmonstar/warp)
   For web server. It's kind of the equivalent of ExpressJS for Rust.
+[tokio] (/* unresolved */)
+  Asynchronous runtime
+[futures-util] (/* unresolved */)
+  Utilities and traits to help with futures
+[argon2] (/* unresolved */)
+  Cryptography library
+[rusqlite] (/* unresolved */)
+  Interface for SQLite RDBMS
 
 Routes:
 /static/..
 /
 /match/:id
 /
+
+Protocols
+[json-0]: {type: string, data: {...}}
+Error: {
+  type: "Error",
+  data: {
+    name: string,
+    message: string
+  }
+}
+Message: {
+  type: "Message",
+  data: {
+    message: string
+  }
+}
