@@ -14,20 +14,6 @@ Routes:
 /static/..
 /
 /match/:id
-/
 
-Protocols
-[json-0]: {type: string, data: {...}}
-Error: {
-  type: "Error",
-  data: {
-    name: string,
-    message: string
-  }
-}
-Message: {
-  type: "Message",
-  data: {
-    message: string
-  }
-}
+/ws/token
+/ws/echo

@@ -30,6 +30,9 @@ class ConnectionManager extends EventEmitter {
     super();
     this.#connection = new WebSocket(url);
     this.#ready = false;
+    // Make a request to /ws/token
+    // Recieve token from server
+    // Send token as message on websocket
   }
 
   get ready() {
@@ -66,11 +69,7 @@ class ConnectionManager extends EventEmitter {
       return Ok("Sent!");
     } catch (error) {
       return Err(
-        new MessageError(
-          400,
-          "Bad Request",
-          "Could not parse obj into valid JSON"
-        )
+        new MessageError(400, "Bad Request", "Could not parse obj into valid JSON")
       );
     }
   }
