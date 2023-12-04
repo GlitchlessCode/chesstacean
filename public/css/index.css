@@ -8,11 +8,13 @@
 	--color-midforeground: #666666;
 	--color-midbackground: #0D0D0D;
 	--color-background:    #000000;
+
+	--header-height: 256px;
 }
 
 body {
 	margin: 0;
-	min-height: 100vh;
+	height: 100vh;
 
 	display: grid;
 	grid-template-rows: auto 1fr;
@@ -62,6 +64,8 @@ nav div.rght svg:active {
 }
 
 main {
+	min-height: 100%;
+
 	display: grid;
 	grid-template-rows: auto 1fr;
 	grid-template-columns: 2fr 1fr;
@@ -79,9 +83,12 @@ main div.bottomleft {
 	grid-column: 1;
 
 	margin: 0 64px;
+	min-height: 100%;
 }
 
 main div.rght {
+	--space-between: 32px;
+
 	grid-row: 1 / 2;
 	grid-column: 2;
 
@@ -89,17 +96,23 @@ main div.rght {
 }
 
 main div.head {
-	height: 256px;
+	height: var(--header-height);
 	margin-bottom: 64px;
+
+	background-image: url("/img/header-bg.png");
+	background-size: 100% 100%;
 
 	border-radius: 20px;
 	background-color: var(--color-midbackground);
 }
 
-main div.topleft div.card-container {
+main div.card-container {
+	height: 100%;
 	overflow-y: scroll;
-	margin-bottom: 64px;
-	white-space: nowrap;
+}
+
+main div.card-container::-webkit-scrollbar {
+	display: none;
 }
 
 main div.card {
@@ -118,6 +131,10 @@ main div.card {
 	user-select: none;
 	border-radius: 20px;
 	background-color: var(--color-midbackground);
+}
+
+main div.card:last-child {
+	margin-bottom: 64px;
 }
 
 main div.card.inactive div.icon-container,
@@ -175,7 +192,31 @@ main div.card img {
 	width: 20px;
 }
 
-main div.rght div {
-	padding: 20px;
-	background-color: red;
+main div.rght div.profiles {
+	height: calc((var(--header-height) - var(--space-between)) * 1/5);
+	margin-bottom: var(--space-between);
+
+	display: flex;
+}
+
+main div.rght div.profiles div.search {
+	flex-grow: 1;
+
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
+}
+
+main div.rght div.profiles div.avatar {
+	height: 100%;
+	margin-left: 16px;
+	aspect-ratio: 1/1;
+
+	border-radius: 100%;
+	background-color: var(--color-midbackground);
+}
+
+main div.rght div.stats {
+	height: calc((var(--header-height) - var(--space-between)) * 4/5);
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
 }
