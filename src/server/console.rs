@@ -1,8 +1,8 @@
-use std::{ io, str::FromStr, fmt::Display };
-use command::{ Command, CommandError };
-use console::{ Console, ConsoleError };
-use arguements::{ Arguement, HelpArguements, ArguementError };
 use super::ServerConfig;
+use arguements::{Arguement, ArguementError, HelpArguements};
+use command::{Command, CommandError};
+use console::{Console, ConsoleError};
+use std::{fmt::Display, io, str::FromStr};
 
 pub fn start(config: ServerConfig) {
     let console = Console::new(config);
@@ -20,10 +20,14 @@ mod console {
 
     impl Display for ConsoleError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", match self {
-                Self::CommandError(a) => format!("{}", a),
-                Self::ArguementError(b) => format!("{}", b),
-            })
+            write!(
+                f,
+                "{}",
+                match self {
+                    Self::CommandError(a) => format!("{}", a),
+                    Self::ArguementError(b) => format!("{}", b),
+                }
+            )
         }
     }
 
@@ -38,9 +42,7 @@ mod console {
         }
 
         pub fn start(&self) {
-            eprintln!(
-                "\x1b[2J\x1b[1;4mChesstacean Console v1.0.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m"
-            );
+            eprintln!("\x1b[2J\x1b[1;4mChesstacean Console v1.0.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m");
             loop {
                 eprint!(" > ");
                 let mut buffer = String::new();
@@ -110,9 +112,12 @@ mod command {
     }
 
     impl Command {
-        const HELP: [(&str, &str); 4] = [
+        const HELP: [(&'static str, &'static str); 4] = [
             ("config", "Get the server's current configuration"),
-            ("help <cmd?>", "Lists all commands, or gets information about a specific command"),
+            (
+                "help <cmd?>",
+                "Lists all commands, or gets information about a specific command",
+            ),
             ("stop", "Stop the server"),
             ("Commands", "help <cmd?> \nconfig \nstop"),
         ];
@@ -144,29 +149,20 @@ mod command {
             if let Some(cmd) = cmd {
                 match cmd {
                     "stop" => Ok(Self::Stop),
-                    "help" => { Ok(Self::Help(HelpArguements::parse(args)?)) }
+                    "help" => Ok(Self::Help(HelpArguements::parse(args)?)),
                     "config" => Ok(Self::Config),
-                    _ =>
-                        Err(
-                            ConsoleError::from(
-                                CommandError(
-                                    String::from("Unknown Command"),
-                                    format!("{} does not exist", cmd),
-                                    String::from(cmd)
-                                )
-                            )
-                        ),
+                    _ => Err(ConsoleError::from(CommandError(
+                        String::from("Unknown Command"),
+                        format!("{} does not exist", cmd),
+                        String::from(cmd),
+                    ))),
                 }
             } else {
-                Err(
-                    ConsoleError::from(
-                        CommandError(
-                            String::from("No Command"),
-                            String::from("No command validly submitted"),
-                            String::new()
-                        )
-                    )
-                )
+                Err(ConsoleError::from(CommandError(
+                    String::from("No Command"),
+                    String::from("No command validly submitted"),
+                    String::new(),
+                )))
             }
         }
     }
@@ -183,13 +179,11 @@ mod command {
 
         #[test]
         fn blank_cmd() {
-            let err = ConsoleError::from(
-                CommandError(
-                    String::from("No Command"),
-                    String::from("No command validly submitted"),
-                    String::new()
-                )
-            );
+            let err = ConsoleError::from(CommandError(
+                String::from("No Command"),
+                String::from("No command validly submitted"),
+                String::new(),
+            ));
 
             let cmd: Result<Command, ConsoleError> = String::from("").parse();
             match_helper(&cmd, &err);
@@ -224,13 +218,11 @@ mod command {
 
         #[test]
         fn invalid_cmd() {
-            let err = ConsoleError::from(
-                CommandError(
-                    String::from("Unknown Command"),
-                    format!("{} does not exist", "foo"),
-                    String::from("foo")
-                )
-            );
+            let err = ConsoleError::from(CommandError(
+                String::from("Unknown Command"),
+                format!("{} does not exist", "foo"),
+                String::from("foo"),
+            ));
 
             let cmd: Result<Command, ConsoleError> = String::from("foo bar").parse();
             match_helper(&cmd, &err);
@@ -258,27 +250,21 @@ mod command {
             let cmd: Result<Command, ConsoleError> = String::from("help foo bar").parse();
             match_helper(
                 &cmd,
-                &ConsoleError::from(
-                    ArguementError(
-                        String::from("Too Many"),
-                        format!("{} arguements were found, only 1 was expected", 2),
-                        format!("help {0} {1}", "foo", "bar")
-                    )
-                )
+                &ConsoleError::from(ArguementError(
+                    String::from("Too Many"),
+                    format!("{} arguements were found, only 1 was expected", 2),
+                    format!("help {0} {1}", "foo", "bar"),
+                )),
             );
 
-            let cmd: Result<Command, ConsoleError> = String::from(
-                "help config foo bar baz"
-            ).parse();
+            let cmd: Result<Command, ConsoleError> = String::from("help config foo bar baz").parse();
             match_helper(
                 &cmd,
-                &ConsoleError::from(
-                    ArguementError(
-                        String::from("Too Many"),
-                        format!("{} arguements were found, only 1 was expected", 4),
-                        format!("help {0} {1}", "config", "foo")
-                    )
-                )
+                &ConsoleError::from(ArguementError(
+                    String::from("Too Many"),
+                    format!("{} arguements were found, only 1 was expected", 4),
+                    format!("help {0} {1}", "config", "foo"),
+                )),
             );
         }
 
@@ -329,17 +315,15 @@ mod arguements {
         fn parse(args: Vec<&str>) -> Result<Self, ArguementError> {
             if args.len() > 1 {
                 let mut iter = args.iter();
-                return Err(
-                    ArguementError(
-                        String::from("Too Many"),
-                        format!("{} arguements were found, only 1 was expected", args.len()),
-                        format!(
-                            "help {0} {1}",
-                            iter.next().unwrap_or(&"None"),
-                            iter.next().unwrap_or(&"None")
-                        )
-                    )
-                );
+                return Err(ArguementError(
+                    String::from("Too Many"),
+                    format!("{} arguements were found, only 1 was expected", args.len()),
+                    format!(
+                        "help {0} {1}",
+                        iter.next().unwrap_or(&"None"),
+                        iter.next().unwrap_or(&"None")
+                    ),
+                ));
             }
             let arg = args.iter().next();
             if let Some(arg) = arg {
@@ -397,8 +381,8 @@ mod arguements {
                 ArguementError(
                     String::from("Too Many"),
                     format!("{} arguements were found, only 1 was expected", 2),
-                    format!("help {0} {1}", "help", "foo")
-                )
+                    format!("help {0} {1}", "help", "foo"),
+                ),
             );
 
             match_helper(
@@ -406,8 +390,8 @@ mod arguements {
                 ArguementError(
                     String::from("Too Many"),
                     format!("{} arguements were found, only 1 was expected", 4),
-                    format!("help {0} {1}", "help", "foo")
-                )
+                    format!("help {0} {1}", "help", "foo"),
+                ),
             )
         }
 

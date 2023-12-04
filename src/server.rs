@@ -1,15 +1,20 @@
 use futures_util::Future;
-use warp::Filter;
 use std::fmt::Display;
 use std::str::FromStr;
+use warp::Filter;
 
-use std::net::{ Ipv4Addr, SocketAddrV4 };
+use std::net::{Ipv4Addr, SocketAddrV4};
 
 pub mod console;
 
 pub fn run_server(config: &ServerConfig) -> impl Future<Output = ()> {
     let images = warp::path("img").and(warp::fs::dir("./public/img"));
-    let routes = images.or(warp::any().map(|| "Hello, World!"));
+    let css = warp::path("css").and(warp::fs::dir("./public/css"));
+    let js = warp::path("js").and(warp::fs::dir("./public/js"));
+    let routes = images
+        .or(css)
+        .or(js)
+        .or(warp::any().and(warp::fs::file("./public/pages/index.html")));
 
     warp::serve(routes).run(config.addr)
 }
@@ -18,8 +23,11 @@ pub fn run_tls_server(config: &ServerConfig) -> Result<impl Future<Output = ()>,
     let routes = warp::any().map(|| "Hello, World!");
 
     match &config.tls {
-        Some(tls) =>
-            Ok(warp::serve(routes).tls().cert_path(&tls.cert).key_path(&tls.key).run(config.addr)),
+        Some(tls) => Ok(warp::serve(routes)
+            .tls()
+            .cert_path(&tls.cert)
+            .key_path(&tls.key)
+            .run(config.addr)),
         None => Err(()),
     }
 }
@@ -32,11 +40,10 @@ pub struct ServerConfig {
 
 fn parse_arg<T: FromStr>(arg: Option<String>) -> Result<T, ()> {
     match arg {
-        Some(arg) =>
-            match arg.parse() {
-                Ok(val) => Ok(val),
-                Err(_) => Err(()),
-            }
+        Some(arg) => match arg.parse() {
+            Ok(val) => Ok(val),
+            Err(_) => Err(()),
+        },
         None => Err(()),
     }
 }
@@ -74,12 +81,16 @@ impl ServerConfig {
 
 impl Display for ServerConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IPv4  {0}\nPort  {1}\nTls?  {2}", self.addr.ip(), self.addr.port(), match
-            &self.tls
-        {
-            None => "No",
-            Some(_) => "Yes",
-        })
+        write!(
+            f,
+            "IPv4  {0}\nPort  {1}\nTls?  {2}",
+            self.addr.ip(),
+            self.addr.port(),
+            match &self.tls {
+                None => "No",
+                Some(_) => "Yes",
+            }
+        )
     }
 }
 
