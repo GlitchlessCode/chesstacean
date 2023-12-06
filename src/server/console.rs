@@ -1,5 +1,5 @@
 use super::ServerConfig;
-use arguements::{Arguement, ArguementError};
+use arguments::{Argument, ArgumentError};
 use command::{Command, CommandError};
 use console::Console;
 use std::{fmt::Display, io, str::FromStr};
@@ -48,7 +48,7 @@ mod console {
             let command = Command::parse(cmd);
             match command {
                 Ok(command) => {
-                    let arguments = Arguement::parse(args, &command);
+                    let arguments = Argument::parse(args, &command);
 
                     // if let Ok(Command::Stop) = command {
                     //     return None;
@@ -144,14 +144,21 @@ mod command {
                 Err(CommandError::NoCommand)
             }
         }
+        pub fn name(&self) -> String {
+            match self {
+                Self::Config => format!("config"),
+                Self::Help => format!("help"),
+                Self::Stop => format!("ctop"),
+            }
+        }
         // pub fn msg(&self, console: &Console) -> String {
         //     match self {
         //         Self::Help(args) => {
         //             let (name, msg) = match args {
-        //                 HelpArguements::Config => Command::HELP[0],
-        //                 HelpArguements::Help => Command::HELP[1],
-        //                 HelpArguements::Stop => Command::HELP[2],
-        //                 HelpArguements::All => Command::HELP[3],
+        //                 HelpArguments::Config => Command::HELP[0],
+        //                 HelpArguments::Help => Command::HELP[1],
+        //                 HelpArguments::Stop => Command::HELP[2],
+        //                 HelpArguments::All => Command::HELP[3],
         //             };
         //             Console::message(&name, &msg)
         //         }
@@ -206,16 +213,16 @@ mod command {
     //         assert_eq!(cmd, Command::Config);
 
     //         let cmd: Command = String::from("help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguements::All));
+    //         assert_eq!(cmd, Command::Help(HelpArguments::All));
 
     //         let cmd: Command = String::from("help stop").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguements::Stop));
+    //         assert_eq!(cmd, Command::Help(HelpArguments::Stop));
 
     //         let cmd: Command = String::from("help config").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguements::Config));
+    //         assert_eq!(cmd, Command::Help(HelpArguments::Config));
 
     //         let cmd: Command = String::from("help help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguements::Help));
+    //         assert_eq!(cmd, Command::Help(HelpArguments::Help));
     //     }
 
     //     #[test]
@@ -238,10 +245,10 @@ mod command {
     //         match_helper(
     //             &cmd,
     //             &ConsoleError::from(
-    //                 ArguementError(
+    //                 ArgumentError(
     //                     String::from("Invalid"),
     //                     format!(
-    //                         "{} is not a valid name of a command. Try running 'help' without arguements to see all commands",
+    //                         "{} is not a valid name of a command. Try running 'help' without arguments to see all commands",
     //                         "foo"
     //                     ),
     //                     format!("help {}", "foo")
@@ -252,9 +259,9 @@ mod command {
     //         let cmd: Result<Command, ConsoleError> = String::from("help foo bar").parse();
     //         match_helper(
     //             &cmd,
-    //             &ConsoleError::from(ArguementError(
+    //             &ConsoleError::from(ArgumentError(
     //                 String::from("Too Many"),
-    //                 format!("{} arguements were found, only 1 was expected", 2),
+    //                 format!("{} arguments were found, only 1 was expected", 2),
     //                 format!("help {0} {1}", "foo", "bar"),
     //             )),
     //         );
@@ -262,9 +269,9 @@ mod command {
     //         let cmd: Result<Command, ConsoleError> = String::from("help config foo bar baz").parse();
     //         match_helper(
     //             &cmd,
-    //             &ConsoleError::from(ArguementError(
+    //             &ConsoleError::from(ArgumentError(
     //                 String::from("Too Many"),
-    //                 format!("{} arguements were found, only 1 was expected", 4),
+    //                 format!("{} arguments were found, only 1 was expected", 4),
     //                 format!("help {0} {1}", "config", "foo"),
     //             )),
     //         );
@@ -279,36 +286,100 @@ mod command {
     // }
 }
 
-mod arguements {
+mod arguments {
+    use self::ArgOption::{None, Optional, Required};
     use super::*;
 
-    // pub trait Arguement {
-    //     type This;
+    enum ArgOption {
+        None,
+        Required(Vec<ArgDef>),
+        Optional(Vec<ArgDef>),
+    }
 
-    //     fn parse(args: Vec<&str>) -> Result<Self::This, ArguementError>;
-    // }
+    impl ArgOption {
+        fn max_len(&self) -> usize {
+            match self {
+                None => 0,
+                Required(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
+                Optional(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
+            }
+        }
+    }
 
-    pub struct Arguement {}
+    enum ArgDef {
+        Command(ArgOption),
+    }
 
-    impl Arguement {
-        pub fn parse(args: Vec<String>, cmd: &Command) -> Result<Self, ArguementError> {
-            Err(ArguementError::Invalid {
+    impl ArgDef {
+        fn max_len(&self) -> usize {
+            match self {
+                ArgDef::Command(opt) => opt.max_len(),
+            }
+        }
+    }
+
+    pub enum Argument {
+        Command(Command, Option<Box<Argument>>),
+    }
+
+    impl Argument {
+        pub fn parse(args: Vec<String>, cmd: &Command) -> Result<Vec<Argument>, ArgumentError> {
+            let definition = Self::cmd_args(&cmd);
+            Self::check_length(&args, &definition, &cmd)?;
+            Err(ArgumentError::Invalid {
                 info: format!(""),
                 location: format!(""),
             })
         }
 
-        fn cmd_args(cmd: &Command) {}
+        fn cmd_args(cmd: &Command) -> ArgOption {
+            match cmd {
+                Command::Config => None,
+                Command::Help => Optional(vec![ArgDef::Command(None)]),
+                Command::Stop => None,
+            }
+        }
+
+        fn check_length(args: &Vec<String>, def: &ArgOption, cmd: &Command) -> Result<(), ArgumentError> {
+            let max = def.max_len();
+            if args.len() > max {
+                let loc = args
+                    .iter()
+                    .map(|x| format!("{x}"))
+                    .reduce(|a, b| format!("{0} {1}", a, b))
+                    .unwrap_or(format!(""));
+                Err(ArgumentError::TooMany {
+                    found: args.len(),
+                    expect: max,
+                    location: format!("{0}{loc}", cmd.name()),
+                })
+            } else {
+                Ok(())
+            }
+        }
+
+        // fn parse_single<T>() -> T {}
     }
 
     #[derive(Debug, PartialEq)]
-    pub enum ArguementError {
-        TooMany { found: u16, expect: u16, location: String },
-        NotEnough { found: u16, expect: u16, location: String },
-        Invalid { info: String, location: String },
+    pub enum ArgumentError {
+        TooMany {
+            found: usize,
+            expect: usize,
+            location: String,
+        },
+        NotEnough {
+            found: usize,
+            expect: usize,
+            location: String,
+        },
+        Invalid {
+            info: String,
+            location: String,
+        },
     }
 
-    fn cmpr1(s: &u16) -> &str {
+    fn cmpr1(s: &usize) -> &str {
         if s == &1 {
             "s"
         } else {
@@ -316,7 +387,7 @@ mod arguements {
         }
     }
 
-    impl Display for ArguementError {
+    impl Display for ArgumentError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let (name, context, location) = match self {
                 Self::TooMany {
@@ -326,7 +397,7 @@ mod arguements {
                 } => (
                     format!("Too Many"),
                     format!(
-                        "{found} arguement{0} found, only {expect} argument{1} expected",
+                        "{found} argument{0} found, only {expect} argument{1} expected",
                         cmpr1(found),
                         cmpr1(expect)
                     ),
@@ -339,7 +410,7 @@ mod arguements {
                 } => (
                     format!("Not Enough"),
                     format!(
-                        "{found} arguement{0} found, {expect} argument{1} expected",
+                        "{found} argument{0} found, {expect} argument{1} expected",
                         cmpr1(found),
                         cmpr1(expect)
                     ),
@@ -347,27 +418,27 @@ mod arguements {
                 ),
                 Self::Invalid { info, location } => (format!("Invalid"), format!("{info}"), format!("{location}")),
             };
-            write!(f, "ArguementError: {name}\n{context}\n > {location} << Here")
+            write!(f, "ArgumentError: {name}\n{context}\n > {location} << Here")
         }
     }
 
     // #[derive(Debug, PartialEq)]
-    // pub enum HelpArguements {
+    // pub enum HelpArguments {
     //     All,
     //     Help,
     //     Stop,
     //     Config,
     // }
 
-    // impl Arguement for HelpArguements {
+    // impl Argument for HelpArguments {
     //     type This = Self;
 
-    //     fn parse(args: Vec<&str>) -> Result<Self, ArguementError> {
+    //     fn parse(args: Vec<&str>) -> Result<Self, ArgumentError> {
     //         if args.len() > 1 {
     //             let mut iter = args.iter();
-    //             return Err(ArguementError(
+    //             return Err(ArgumentError(
     //                 String::from("Too Many"),
-    //                 format!("{} arguements were found, only 1 was expected", args.len()),
+    //                 format!("{} arguments were found, only 1 was expected", args.len()),
     //                 format!(
     //                     "help {0} {1}",
     //                     iter.next().unwrap_or(&"None"),
@@ -379,13 +450,13 @@ mod arguements {
     //         if let Some(arg) = arg {
     //             arg.parse()
     //         } else {
-    //             Ok(HelpArguements::All)
+    //             Ok(HelpArguments::All)
     //         }
     //     }
     // }
 
-    // impl FromStr for HelpArguements {
-    //     type Err = ArguementError;
+    // impl FromStr for HelpArguments {
+    //     type Err = ArgumentError;
     //     fn from_str(s: &str) -> Result<Self, Self::Err> {
     //         match s {
     //             "stop" => Ok(Self::Stop),
@@ -393,9 +464,9 @@ mod arguements {
     //             "config" => Ok(Self::Config),
     //             _ =>
     //                 Err(
-    //                     ArguementError(
+    //                     ArgumentError(
     //                         String::from("Invalid"),
-    //                         format!("{} is not a valid name of a command. Try running 'help' without arguements to see all commands", s),
+    //                         format!("{} is not a valid name of a command. Try running 'help' without arguments to see all commands", s),
     //                         format!("help {}", s)
     //                     )
     //                 ),
@@ -408,38 +479,38 @@ mod arguements {
     //     use super::*;
     //     #[test]
     //     fn no_args() {
-    //         let args = HelpArguements::parse(vec![]).unwrap();
-    //         assert_eq!(args, HelpArguements::All);
+    //         let args = HelpArguments::parse(vec![]).unwrap();
+    //         assert_eq!(args, HelpArguments::All);
     //     }
 
     //     #[test]
     //     fn valid_args() {
-    //         let args = HelpArguements::parse(vec!["help"]).unwrap();
-    //         assert_eq!(args, HelpArguements::Help);
+    //         let args = HelpArguments::parse(vec!["help"]).unwrap();
+    //         assert_eq!(args, HelpArguments::Help);
 
-    //         let args = HelpArguements::parse(vec!["config"]).unwrap();
-    //         assert_eq!(args, HelpArguements::Config);
+    //         let args = HelpArguments::parse(vec!["config"]).unwrap();
+    //         assert_eq!(args, HelpArguments::Config);
 
-    //         let args = HelpArguements::parse(vec!["stop"]).unwrap();
-    //         assert_eq!(args, HelpArguements::Stop);
+    //         let args = HelpArguments::parse(vec!["stop"]).unwrap();
+    //         assert_eq!(args, HelpArguments::Stop);
     //     }
 
     //     #[test]
     //     fn too_many_args() {
     //         match_helper(
-    //             HelpArguements::parse(vec!["help", "foo"]),
-    //             ArguementError(
+    //             HelpArguments::parse(vec!["help", "foo"]),
+    //             ArgumentError(
     //                 String::from("Too Many"),
-    //                 format!("{} arguements were found, only 1 was expected", 2),
+    //                 format!("{} arguments were found, only 1 was expected", 2),
     //                 format!("help {0} {1}", "help", "foo"),
     //             ),
     //         );
 
     //         match_helper(
-    //             HelpArguements::parse(vec!["help", "foo", "bar", "baz"]),
-    //             ArguementError(
+    //             HelpArguments::parse(vec!["help", "foo", "bar", "baz"]),
+    //             ArgumentError(
     //                 String::from("Too Many"),
-    //                 format!("{} arguements were found, only 1 was expected", 4),
+    //                 format!("{} arguments were found, only 1 was expected", 4),
     //                 format!("help {0} {1}", "help", "foo"),
     //             ),
     //         )
@@ -448,11 +519,11 @@ mod arguements {
     //     #[test]
     //     fn invalid_arg() {
     //         match_helper(
-    //             HelpArguements::parse(vec!["hel"]),
-    //             ArguementError(
+    //             HelpArguments::parse(vec!["hel"]),
+    //             ArgumentError(
     //                 String::from("Invalid"),
     //                 format!(
-    //                     "{} is not a valid name of a command. Try running 'help' without arguements to see all commands",
+    //                     "{} is not a valid name of a command. Try running 'help' without arguments to see all commands",
     //                     "hel"
     //                 ),
     //                 format!("help {}", "hel")
@@ -460,9 +531,9 @@ mod arguements {
     //         )
     //     }
 
-    //     fn match_helper(x: Result<HelpArguements, ArguementError>, eq: ArguementError) {
+    //     fn match_helper(x: Result<HelpArguments, ArgumentError>, eq: ArgumentError) {
     //         match x {
-    //             Ok(_) => panic!("Should be an ArguementError"),
+    //             Ok(_) => panic!("Should be an ArgumentError"),
     //             Err(e) => {
     //                 assert_eq!(e, eq);
     //             }
