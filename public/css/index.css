@@ -23,12 +23,12 @@ body {
 	background-color: var(--color-background);
 }
 
-nav {
+body > nav {
 	padding: 64px;
 	user-select: none;
 }
 
-nav div.left {
+body > nav div.left {
 	font-size: 1rem;
 	font-family: var(--font-family);
 
@@ -37,17 +37,17 @@ nav div.left {
 	cursor: pointer;
 }
 
-nav div.right {
+body > nav div.right {
 	float: right;
 }
 
-nav div.left img {
+body > nav div.left img {
 	width: 32px;
 	aspect-ratio: 1/1;
 	margin-right: 16px;
 }
 
-nav div.right svg {
+body > nav div.right svg {
 	fill: var(--color-midforeground);
 	cursor: pointer;
 	margin-left: 16px;
@@ -56,11 +56,11 @@ nav div.right svg {
 	transition-property: all;
 }
 
-nav div.right svg:hover {
+body > nav div.right svg:hover {
 	fill: var(--color-accent);
 }
 
-nav div.right svg:active {
+body > nav div.right svg:active {
 	scale: .95;
 }
 
@@ -112,9 +112,9 @@ main > div.topleft > div.head {
 main > div.topleft > div.head > div.left {
 	display: flex;
 	flex-direction: column;
+	justify-content: center;
 
-	padding: 64px;
-	padding-right: 0;
+	padding: 0 64px;
 }
 
 main > div.topleft > div.head > div.left > h1 {
@@ -176,12 +176,16 @@ main > div.topleft > div.head > div.left > div > button > div:active {
 	scale: .95;
 }
 
-main > div.topleft > div.head > div.right {
-	flex-grow: 1;
-	background-image: url('/img/mascot.png');
-	background-repeat: no-repeat;
-	background-position: 50% bottom;
-	background-size: 75%;
+@media (min-width: 1150px) {
+	main > div.topleft > div.head > div.right {
+		flex-grow: 1;
+		translate: -32px 0;
+
+		background-size: 75%;
+		background-image: url('/img/mascot.png');
+		background-repeat: no-repeat;
+		background-position: 50% bottom;
+	}
 }
 
 main > div.bottomleft > div.card-container {
@@ -315,3 +319,115 @@ main > div.right > div.stats {
 	border-radius: 20px;
 	background-color: var(--color-midbackground);
 }
+
+div.game {
+	--canvas-size: calc(100vh - 2/10 * 100vw);
+
+	width: 100vw;
+	height: 100vh;
+
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+	grid-template-columns: 1fr 50vw 1fr;
+
+	transition-property: all;
+	transition-duration: .2s;
+
+	scale: .85;
+	opacity: 0;
+	z-index: -1;
+	position: absolute;
+	background-color: var(--color-background);
+}
+
+div.game.active {
+	scale: 1;
+	opacity: 1;
+	z-index: 1;
+}
+
+div.game > nav {
+	grid-row: 1;
+	grid-column: 1 / 4;
+
+	margin: 64px 32px;
+
+	display: flex;
+	justify-content: space-between;
+}
+
+div.game > nav svg {
+	width: 32px;
+	aspect-ratio: 1/1;
+
+	transition-property: all;
+	transition-duration: .2s;
+
+	fill: var(--color-midforeground);
+	cursor: pointer;
+	user-select: none;
+}
+
+div.game > nav svg:hover {
+	fill: var(--color-accent);
+}
+
+div.game > nav svg:active {
+	scale: 0.95;
+}
+
+div.game > div.right {
+	grid-row: 2;
+	grid-column: 3;
+	margin-right: 32px;
+
+	overflow-y: scroll;
+}
+
+div.game > div.right::-webkit-scrollbar {
+	display: none;
+}
+
+div.game > div.right > div {
+	font-size: 24px;
+	font-family: var(--font-family);
+	font-weight: 500;
+
+	display: flex;
+	align-items: center;
+	justify-content: space-around;
+
+	padding: 24px;
+	margin-bottom: 16px;
+
+	color: var(--color-midforeground);
+	border-radius: 12px;
+	background-color: var(--color-midbackground);
+}
+
+div.game > div.right > div > svg {
+	width: 24px;
+	aspect-ratio: 1/1;
+
+	fill: var(--color-midforeground);
+}
+
+div.game > div.footer {
+	grid-row: 3;
+	grid-column: 1 / 4;
+
+	margin: 32px;
+	display: flex;
+	align-items: end;
+	justify-content: right;
+}
+
+div.game > div.footer svg {
+	width: 32px;
+	aspect-ratio: 1/1;
+
+	fill: var(--color-midforeground);
+}
+
+/* TODO: ADD HOVER AND ACTIVE EFFECTS FOR MORE BUTTON IN MOVE CARDS AND FOR HELP BUTTON. ALSO FIX USER-SELECT */
+
