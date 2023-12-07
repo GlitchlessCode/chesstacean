@@ -61,7 +61,7 @@ body > nav div.right svg:hover {
 }
 
 body > nav div.right svg:active {
-	scale: .95;
+	scale: .85;
 }
 
 main {
@@ -173,7 +173,7 @@ main > div.topleft > div.head > div.left > div > button > div {
 }
 
 main > div.topleft > div.head > div.left > div > button > div:active {
-	scale: .95;
+	scale: .85;
 }
 
 @media (min-width: 1150px) {
@@ -284,7 +284,7 @@ main > div.bottomleft > div.card-container > div.card button > div {
 }
 
 main > div.bottomleft > div.card-container > div.card button:active > div {
-	scale: .95;
+	scale: .85;
 }
 
 main > div.bottomleft > div.card-container > div.card img {
@@ -321,6 +321,7 @@ main > div.right > div.stats {
 }
 
 div.game {
+	--game-margin: 32px;
 	--canvas-size: calc(100vh - 2/10 * 100vw);
 
 	width: 100vw;
@@ -337,6 +338,7 @@ div.game {
 	opacity: 0;
 	z-index: -1;
 	position: absolute;
+	user-select: none;
 	background-color: var(--color-background);
 }
 
@@ -350,7 +352,7 @@ div.game > nav {
 	grid-row: 1;
 	grid-column: 1 / 4;
 
-	margin: 64px 32px;
+	margin: 64px var(--game-margin);
 
 	display: flex;
 	justify-content: space-between;
@@ -376,10 +378,125 @@ div.game > nav svg:active {
 	scale: 0.95;
 }
 
+div.game > div.left {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+div.game > div.left > div.player {
+	--avatar-size: calc(var(--game-margin) * 2);
+
+	display: grid;
+	grid-template-rows: var(--avatar-size) 1fr;
+	grid-template-columns: var(--game-margin) var(--avatar-size) 1fr min-content;
+}
+
+div.game > div.left > div.player > div.turn-marker {
+	--turn-marker-width: calc(var(--game-margin) / 4);
+	--turn-marker-border-radius: calc(var(--turn-marker-width) / 2);
+
+	grid-row: 1 / 3;
+	grid-column: 1;
+
+	width: var(--turn-marker-width);
+	height: 100%;
+
+	border-top-right-radius: var(--turn-marker-border-radius);
+	border-bottom-right-radius: var(--turn-marker-border-radius);
+	background-color: var(--color-midbackground);
+}
+
+div.game > div.left > div.player.active > div.turn-marker {
+	background-color: var(--color-accent);
+}
+
+div.game > div.left > div.player > div.avatar {
+	width: 100%;
+	aspect-ratio: 1/1;
+
+	grid-row: 1;
+	grid-column: 2;
+
+	border-radius: 8px;
+	background-color: var(--color-midbackground);
+}
+
+div.game > div.left > div.player.active > div.avatar {
+	background-color: var(--color-accent);
+}
+
+div.game > div.left > div.player > div.user {
+	font-family: var(--font-family);
+	font-weight: 500;
+
+	grid-row: 1;
+	grid-column: 3;
+
+	margin: 0 calc(var(--game-margin) / 2);
+}
+
+div.game > div.left > div.player > div.user > div.displayname {
+	color: var(--color-foreground);
+	font-size: 1.125rem;
+}
+
+div.game > div.left > div.player > div.user > div.handle {
+	color: var(--color-midforeground);
+	font-size: 1rem;
+}
+
+div.game > div.left > div.player > div.clock {
+	grid-row: 2;
+	grid-column: 2 / 5;
+
+	height: var(--game-margin);
+	margin-top: calc(var(--game-margin) / 2);
+
+	border-color: var(--color-midbackground);
+	border-style: solid;
+	border-width: 4px;
+	border-radius: 8px;
+
+	box-sizing: border-box;
+}
+
+div.game > div.left > div.player > div.clock > div {
+	height: 100%;
+	background-color: var(--color-midbackground);
+}
+
+div.game > div.left > div.player.active > div.clock {
+	border-color: var(--color-accent);
+}
+
+div.game > div.left > div.player.active > div.clock > div {
+	background-color: var(--color-accent);
+}
+
+div.game > div.left > div.player > svg {
+	width: 24px;
+	cursor: pointer;
+	aspect-ratio: 1/1;
+
+	transition-property: all;
+	transition-duration: .2s;
+
+	fill: var(--color-foreground);
+}
+
+div.game > div.left > div.player > svg:hover {
+	fill: var(--color-accent);
+}
+
+div.game > div.left > div.player > svg:active {
+	scale: .85;
+}
+
 div.game > div.right {
 	grid-row: 2;
 	grid-column: 3;
-	margin-right: 32px;
+	margin-right: var(--game-margin);
 
 	overflow-y: scroll;
 }
@@ -407,27 +524,54 @@ div.game > div.right > div {
 
 div.game > div.right > div > svg {
 	width: 24px;
+	cursor: pointer;
 	aspect-ratio: 1/1;
 
 	fill: var(--color-midforeground);
+}
+
+div.game > div.right > div > svg:last-child {
+	transition-duration: .2s;
+	transition-property: all;
+}
+
+div.game > div.right > div > svg:last-child:hover {
+	fill: var(--color-accent);
+}
+
+div.game > div.right > div > svg:last-child:active {
+	scale: .85;
 }
 
 div.game > div.footer {
 	grid-row: 3;
 	grid-column: 1 / 4;
 
-	margin: 32px;
+	margin: var(--game-margin);
 	display: flex;
 	align-items: end;
 	justify-content: right;
 }
 
-div.game > div.footer svg {
+div.game > div.footer > svg {
 	width: 32px;
 	aspect-ratio: 1/1;
 
+	grid-row: 1;
+	grid-column: 4;
+
+	transition-duration: .2s;
+	transition-property: all;
+
 	fill: var(--color-midforeground);
+	cursor: pointer;
 }
 
-/* TODO: ADD HOVER AND ACTIVE EFFECTS FOR MORE BUTTON IN MOVE CARDS AND FOR HELP BUTTON. ALSO FIX USER-SELECT */
+div.game > div.footer > svg:hover {
+	fill: var(--color-accent);
+}
+
+div.game > div.footer > svg:active {
+	scale: .85;
+}
 
