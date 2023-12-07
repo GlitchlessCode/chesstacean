@@ -182,6 +182,13 @@ mod command {
         }
     }
 
+    impl FromStr for Command {
+        type Err = ();
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {}
+        }
+    }
+
     // #[cfg(test)]
     // mod tests {
     //     use super::*;
@@ -296,36 +303,38 @@ mod arguments {
         Optional(Vec<ArgDef>),
     }
 
-    impl ArgOption {
-        fn max_len(&self) -> usize {
-            match self {
-                None => 0,
-                Required(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
-                Optional(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
-            }
-        }
-    }
+    // impl ArgOption {
+    //     fn max_len(&self) -> usize {
+    //         match self {
+    //             None => 0,
+    //             Required(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
+    //             Optional(defs) => defs.iter().map(|def| def.max_len()).max().unwrap_or(0) + 1,
+    //         }
+    //     }
+    // }
 
     enum ArgDef {
         Command(ArgOption),
     }
 
-    impl ArgDef {
-        fn max_len(&self) -> usize {
-            match self {
-                ArgDef::Command(opt) => opt.max_len(),
-            }
-        }
-    }
+    // impl ArgDef {
+    //     fn max_len(&self) -> usize {
+    //         match self {
+    //             ArgDef::Command(opt) => opt.max_len(),
+    //         }
+    //     }
+    // }
 
     pub enum Argument {
+        None,
         Command(Command, Option<Box<Argument>>),
     }
 
     impl Argument {
         pub fn parse(args: Vec<String>, cmd: &Command) -> Result<Vec<Argument>, ArgumentError> {
             let definition = Self::cmd_args(&cmd);
-            Self::check_length(&args, &definition, &cmd)?;
+            // Self::check_length(&args, &definition, &cmd)?;
+            Self::parse_iter(args.iter(), &definition, cmd.name(), (args.len(), 0));
             Err(ArgumentError::Invalid {
                 info: format!(""),
                 location: format!(""),
@@ -340,25 +349,82 @@ mod arguments {
             }
         }
 
-        fn check_length(args: &Vec<String>, def: &ArgOption, cmd: &Command) -> Result<(), ArgumentError> {
-            let max = def.max_len();
-            if args.len() > max {
-                let loc = args
-                    .iter()
-                    .map(|x| format!("{x}"))
-                    .reduce(|a, b| format!("{0} {1}", a, b))
-                    .unwrap_or(format!(""));
-                Err(ArgumentError::TooMany {
-                    found: args.len(),
-                    expect: max,
-                    location: format!("{0}{loc}", cmd.name()),
-                })
-            } else {
-                Ok(())
+        fn parse_iter<'a, I>(
+            mut iter: I,
+            opt: &ArgOption,
+            mut location: String,
+            mut count: (usize, usize),
+        ) -> Result<Argument, ArgumentError>
+        where
+            I: Iterator<Item = &'a String>,
+        {
+            let arg = iter.next();
+            match arg {
+                Option::None => {
+                    if let Required(def) = opt {
+                        Err(ArgumentError::NotEnough {
+                            found: count.0,
+                            expect: count.1 + 1,
+                            location: location + "_",
+                        })
+                    } else {
+                        Ok(Argument::None)
+                    }
+                }
+                Option::Some(arg) => {
+                    location.push_str(&format!(" {arg}"));
+                    match opt {
+                        None => Err(ArgumentError::TooMany {
+                            found: count.0,
+                            expect: count.1,
+                            location,
+                        }),
+                        Optional(def) => {
+                            let parsed = Self::parse_single(arg, &def, &location)?;
+                        }
+                        Required(def) => {}
+                    }
+                }
             }
         }
 
-        // fn parse_single<T>() -> T {}
+        // fn check_length(args: &Vec<String>, def: &ArgOption, cmd: &Command) -> Result<(), ArgumentError> {
+        //     let max = def.max_len();
+        //     if args.len() > max {
+        //         let loc = args[..(max + 1)]
+        //             .iter()
+        //             .map(|x| format!("{x}"))
+        //             .reduce(|a, b| format!("{a} {b}"))
+        //             .unwrap_or(format!(""));
+        //         Err(ArgumentError::TooMany {
+        //             found: args.len(),
+        //             expect: max,
+        //             location: format!("{0} {loc}", cmd.name()),
+        //         })
+        //     } else {
+        //         Ok(())
+        //     }
+
+        //     Ok(())
+        // }
+
+        fn parse_single<'a>(
+            arg: &String,
+            def_vec: &'a Vec<ArgDef>,
+            location: &String,
+        ) -> Result<&'a ArgOption, ArgumentError> {
+            for def in def_vec {
+                match def {
+                    ArgDef::Command(opt) => {
+                        let parsed: Result<Command, _> = arg.parse();
+                        return Ok(opt);
+                    }
+                }
+            }
+            Err(ArgumentError::Invalid {
+                location: format!("{}", location),
+            })
+        }
     }
 
     #[derive(Debug, PartialEq)]
@@ -374,7 +440,6 @@ mod arguments {
             location: String,
         },
         Invalid {
-            info: String,
             location: String,
         },
     }
@@ -416,7 +481,11 @@ mod arguments {
                     ),
                     format!("{location}"),
                 ),
-                Self::Invalid { info, location } => (format!("Invalid"), format!("{info}"), format!("{location}")),
+                Self::Invalid { location } => (
+                    format!("Invalid"),
+                    format!("Argument is invalid"),
+                    format!("{location}"),
+                ),
             };
             write!(f, "ArgumentError: {name}\n{context}\n > {location} << Here")
         }
@@ -474,9 +543,26 @@ mod arguments {
     //     }
     // }
 
-    // #[cfg(test)]
-    // mod tests {
-    //     use super::*;
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn too_many_args() {
+            let result = Argument::parse(vec![format!("config"), format!("foo")], &Command::Help);
+            if let Err(e) = result {
+                assert_eq!(
+                    e,
+                    ArgumentError::TooMany {
+                        found: 2,
+                        expect: 1,
+                        location: format!("help config foo")
+                    }
+                )
+            } else {
+                panic!("Should be Err")
+            }
+        }
+    }
     //     #[test]
     //     fn no_args() {
     //         let args = HelpArguments::parse(vec![]).unwrap();
