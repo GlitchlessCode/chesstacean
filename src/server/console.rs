@@ -2,11 +2,10 @@ use super::ServerConfig;
 use arguments::Argument;
 use command::Command;
 use console::Console;
-use std::{ fmt::Display, io, str::FromStr, slice::Iter, cell::RefCell, vec };
+use std::{cell::RefCell, fmt::Display, io, slice::Iter, str::FromStr, vec};
 
 pub fn start(config: ServerConfig) {
-    let console = Console::new(config);
-    console.start()
+    Console::new(config).start();
 }
 
 mod console {
@@ -23,9 +22,7 @@ mod console {
         }
 
         pub fn start(&self) {
-            eprintln!(
-                "\x1b[2J\x1b[1;4mChesstacean Console v1.0.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m"
-            );
+            eprintln!("\x1b[2J\x1b[1;4mChesstacean Console v1.1.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m");
             loop {
                 // Take Input
                 eprint!(" > ");
@@ -51,12 +48,10 @@ mod console {
         fn process_command(&self, (cmd, args): (Option<String>, Vec<String>)) -> Option<String> {
             eprint!("\x1b[1m"); // Bold
             match Command::parse(cmd) {
-                Ok(command) => {
-                    match Argument::parse(args, &command) {
-                        Ok(arguments) => self.run(command, arguments),
-                        Err(error) => Some(Self::error(&error)),
-                    }
-                }
+                Ok(command) => match Argument::parse(args, &command) {
+                    Ok(arguments) => self.run(command, arguments),
+                    Err(error) => Some(Self::error(&error)),
+                },
                 Err(error) => Some(Self::error(&error)),
             }
         }
@@ -65,15 +60,11 @@ mod console {
             match cmd {
                 Command::Stop => None,
                 Command::Config => Some(Self::message(&"Server Config", &self.server_config)),
-                Command::Help => {
-                    Some(
-                        if let Argument::Command(search, _) = args {
-                            Self::message(&"Help", &search)
-                        } else {
-                            Self::message(&"Help", &"help <cmd?> \nconfig \nstop")
-                        }
-                    )
-                }
+                Command::Help => Some(if let Argument::Command(search, _) = args {
+                    Self::message(&"Help", &search)
+                } else {
+                    Self::message(&"Help", &"help <cmd?> \nconfig \nstop")
+                }),
             }
         }
 
@@ -107,14 +98,16 @@ mod command {
     impl Display for CommandError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let (name, context, location) = match self {
-                Self::Unknown(cmd) =>
-                    (
-                        format!("Unknown Command"),
-                        format!("{} does not exist", cmd),
-                        format!("{}", cmd),
-                    ),
-                Self::NoCommand =>
-                    (format!("No Command"), format!("No command validly submitted"), String::new()),
+                Self::Unknown(cmd) => (
+                    format!("Unknown Command"),
+                    format!("{} does not exist", cmd),
+                    format!("{}", cmd),
+                ),
+                Self::NoCommand => (
+                    format!("No Command"),
+                    format!("No command validly submitted"),
+                    String::new(),
+                ),
             };
             write!(f, "CommandError: {name}\n{context}\n > {location} << Here")
         }
@@ -128,15 +121,6 @@ mod command {
     }
 
     impl Command {
-        // const HELP: [(&'static str, &'static str); 4] = [
-        //     ("config", "Get the server's current configuration"),
-        //     (
-        //         "help <cmd?>",
-        //         "Lists all commands, or gets information about a specific command",
-        //     ),
-        //     ("stop", "Stop the server"),
-        //     ("Commands", "help <cmd?> \nconfig \nstop"),
-        // ];
         pub fn parse(cmd: Option<String>) -> Result<Self, CommandError> {
             if let Some(cmd) = cmd {
                 match &cmd[..] {
@@ -156,32 +140,16 @@ mod command {
                 Self::Stop => format!("stop"),
             }
         }
-        // pub fn msg(&self, console: &Console) -> String {
-        //     match self {
-        //         Self::Help(args) => {
-        //             let (name, msg) = match args {
-        //                 HelpArguments::Config => Command::HELP[0],
-        //                 HelpArguments::Help => Command::HELP[1],
-        //                 HelpArguments::Stop => Command::HELP[2],
-        //                 HelpArguments::All => Command::HELP[3],
-        //             };
-        //             Console::message(&name, &msg)
-        //         }
-        //         Self::Config => Console::message(&"Server Config", &console.server_config),
-        //         _ => String::new(),
-        //     }
-        // }
     }
 
     impl Display for Command {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let (name, msg) = match self {
                 Self::Config => ("config", "Get the server's current configuration"),
-                Self::Help =>
-                    (
-                        "help <cmd?>",
-                        "Lists all commands, or gets information about a specific command",
-                    ),
+                Self::Help => (
+                    "help <cmd?>",
+                    "Lists all commands, or gets information about a specific command",
+                ),
                 Self::Stop => ("stop", "Stop the server"),
             };
             write!(f, "{}: {}", name, msg)
@@ -200,112 +168,18 @@ mod command {
         }
     }
 
-    // #[cfg(test)]
-    // mod tests {
-    //     use super::*;
-
-    //     #[test]
-    //     fn blank_cmd() {
-    //         let err = ConsoleError::from(CommandError(
-    //             String::from("No Command"),
-    //             String::from("No command validly submitted"),
-    //             String::new(),
-    //         ));
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("").parse();
-    //         match_helper(&cmd, &err);
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("       ").parse();
-    //         match_helper(&cmd, &err);
-
-    //         let cmd: Result<Command, ConsoleError> = String::new().parse();
-    //         match_helper(&cmd, &err);
-    //     }
-
-    //     #[test]
-    //     fn valid_cmd() {
-    //         let cmd: Command = String::from("stop").parse().unwrap();
-    //         assert_eq!(cmd, Command::Stop);
-
-    //         let cmd: Command = String::from("config").parse().unwrap();
-    //         assert_eq!(cmd, Command::Config);
-
-    //         let cmd: Command = String::from("help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::All));
-
-    //         let cmd: Command = String::from("help stop").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Stop));
-
-    //         let cmd: Command = String::from("help config").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Config));
-
-    //         let cmd: Command = String::from("help help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Help));
-    //     }
-
-    //     #[test]
-    //     fn invalid_cmd() {
-    //         let err = ConsoleError::from(CommandError(
-    //             String::from("Unknown Command"),
-    //             format!("{} does not exist", "foo"),
-    //             String::from("foo"),
-    //         ));
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("foo bar").parse();
-    //         match_helper(&cmd, &err);
-    //     }
-
-    //     #[test]
-    //     fn invalid_help() {
-    //         let cmd: Result<Command, ConsoleError> = String::from("help foo").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(
-    //                 ArgumentError(
-    //                     String::from("Invalid"),
-    //                     format!(
-    //                         "{} is not a valid name of a command. Try running 'help' without arguments to see all commands",
-    //                         "foo"
-    //                     ),
-    //                     format!("help {}", "foo")
-    //                 )
-    //             )
-    //         );
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("help foo bar").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(ArgumentError(
-    //                 String::from("Too Many"),
-    //                 format!("{} arguments were found, only 1 was expected", 2),
-    //                 format!("help {0} {1}", "foo", "bar"),
-    //             )),
-    //         );
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("help config foo bar baz").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(ArgumentError(
-    //                 String::from("Too Many"),
-    //                 format!("{} arguments were found, only 1 was expected", 4),
-    //                 format!("help {0} {1}", "config", "foo"),
-    //             )),
-    //         );
-    //     }
-
-    //     fn match_helper(x: &Result<Command, ConsoleError>, eq: &ConsoleError) {
-    //         match x {
-    //             Ok(_) => panic!("Should be a ConsoleError"),
-    //             Err(e) => assert_eq!(eq, e),
-    //         }
-    //     }
-    // }
+    #[cfg(test)]
+    mod tests {
+        #[allow(unused_imports)]
+        use super::*;
+    }
 }
 
 mod arguments {
-    use self::ArgOption::{ None, Optional, RequiredChain, Required };
+    use self::ArgOption::{None, Optional, Required, RequiredChain};
     use super::*;
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone)]
     enum ArgOption {
         None,
@@ -330,6 +204,7 @@ mod arguments {
         def: Def,
     }
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone)]
     enum Def {
         Command,
@@ -340,6 +215,7 @@ mod arguments {
         fn new(def: Def, opt: ArgOption) -> Self {
             Self { opt, def }
         }
+        #[allow(dead_code)]
         fn new_boxed(def: Def, opt: ArgOption) -> Box<Self> {
             Box::new(Self::new(def, opt))
         }
@@ -389,12 +265,11 @@ mod arguments {
                 Option::Some(arg) => {
                     self.location.borrow_mut().push_str(&format!(" {arg}"));
                     match definition {
-                        None =>
-                            Err(ArgumentError::TooMany {
-                                found: self.found,
-                                expect: *self.expect.borrow(),
-                                location: self.location.borrow().to_string(),
-                            }),
+                        None => Err(ArgumentError::TooMany {
+                            found: self.found,
+                            expect: *self.expect.borrow(),
+                            location: self.location.borrow().to_string(),
+                        }),
                         Required(def) => self.parse_arg(&arg, vec![*def]),
                         RequiredChain(def_list) => self.parse_arg(&arg, def_list),
                         Optional(def_list) => self.parse_arg(&arg, def_list),
@@ -468,36 +343,49 @@ mod arguments {
     }
 
     fn cmpr1(s: &usize) -> &str {
-        if s == &1 { "" } else { "s" }
+        if s == &1 {
+            ""
+        } else {
+            "s"
+        }
     }
 
     impl Display for ArgumentError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             let (name, context, location) = match self {
-                Self::TooMany { found, expect, location } =>
-                    (
-                        format!("Too Many"),
-                        format!(
-                            "{found} argument{0} found, only {expect} argument{1} expected",
-                            cmpr1(found),
-                            cmpr1(&usize::from(expect.clone()))
-                        ),
-                        format!("{location}"),
+                Self::TooMany {
+                    found,
+                    expect,
+                    location,
+                } => (
+                    format!("Too Many"),
+                    format!(
+                        "{found} argument{0} found, only {expect} argument{1} expected",
+                        cmpr1(found),
+                        cmpr1(&usize::from(expect.clone()))
                     ),
-                Self::NotEnough { found, expect, location } =>
-                    (
-                        format!("Not Enough"),
-                        format!(
-                            "{found} argument{0} found, {1}{2} argument{3} expected",
-                            cmpr1(found),
-                            expect.0,
-                            expect.1,
-                            cmpr1(&usize::from(expect.0.clone()))
-                        ),
-                        format!("{location}"),
+                    format!("{location}"),
+                ),
+                Self::NotEnough {
+                    found,
+                    expect,
+                    location,
+                } => (
+                    format!("Not Enough"),
+                    format!(
+                        "{found} argument{0} found, {1}{2} argument{3} expected",
+                        cmpr1(found),
+                        expect.0,
+                        expect.1,
+                        cmpr1(&usize::from(expect.0.clone()))
                     ),
-                Self::Invalid { location } =>
-                    (format!("Invalid"), format!("Argument is invalid"), format!("{location}")),
+                    format!("{location}"),
+                ),
+                Self::Invalid { location } => (
+                    format!("Invalid"),
+                    format!("Argument is invalid"),
+                    format!("{location}"),
+                ),
             };
             write!(f, "ArgumentError: {name}\n{context}\n > {location} << Here")
         }
@@ -517,9 +405,7 @@ mod arguments {
             let br2 = Optional(vec![ArgDef::new(Def::Number, br2)]);
             let br2 = Optional(vec![ArgDef::new(Def::Command, br2)]);
 
-            let br2 = RequiredChain(
-                vec![ArgDef::new(Def::Command, br2), ArgDef::new(Def::Number, None)]
-            );
+            let br2 = RequiredChain(vec![ArgDef::new(Def::Command, br2), ArgDef::new(Def::Number, None)]);
 
             let br1 = Optional(vec![ArgDef::new(Def::Command, br1), ArgDef::new(Def::Number, br2)]);
 
@@ -530,14 +416,11 @@ mod arguments {
 
         fn test_example_def(args: Vec<&str>) -> Result<Argument, ArgumentError> {
             ArgParser::new(
-                args
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .iter(),
+                args.iter().map(|s| s.to_string()).collect::<Vec<String>>().iter(),
                 format!("test"),
-                args.len()
-            ).parse_iter(example_def())
+                args.len(),
+            )
+            .parse_iter(example_def())
         }
 
         fn should_err(res: Result<Argument, ArgumentError>) -> ArgumentError {
@@ -559,122 +442,171 @@ mod arguments {
             assert_eq!(result, Argument::None);
 
             let result = should_err(test_example_def(vec![]));
-            assert_eq!(result, ArgumentError::NotEnough {
-                found: 0,
-                expect: (1, "".to_string()),
-                location: "test".to_string(),
-            })
+            assert_eq!(
+                result,
+                ArgumentError::NotEnough {
+                    found: 0,
+                    expect: (1, "".to_string()),
+                    location: "test".to_string(),
+                }
+            )
         }
 
         #[test]
         fn too_many_args() {
-            let result = should_err(
-                Argument::parse(vec![format!("config"), format!("foo")], &Command::Help)
+            let result = should_err(Argument::parse(vec![format!("config"), format!("foo")], &Command::Help));
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 2,
+                    expect: 1,
+                    location: "help config foo".to_string(),
+                }
             );
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 2,
-                expect: 1,
-                location: "help config foo".to_string(),
-            });
 
             let result = should_err(Argument::parse(vec![format!("foo")], &Command::Stop));
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 1,
-                expect: 0,
-                location: "stop foo".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 1,
+                    expect: 0,
+                    location: "stop foo".to_string(),
+                }
+            );
 
             let result = should_err(Argument::parse(vec![format!("foo")], &Command::Config));
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 1,
-                expect: 0,
-                location: "config foo".to_string(),
-            });
-
-            let result = should_err(
-                test_example_def(vec!["1234", "config", "1234", "1234", "1234", "foo"])
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 1,
+                    expect: 0,
+                    location: "config foo".to_string(),
+                }
             );
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 6,
-                expect: 5,
-                location: "test 1234 config 1234 1234 1234 foo".to_string(),
-            });
+
+            let result = should_err(test_example_def(vec!["1234", "config", "1234", "1234", "1234", "foo"]));
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 6,
+                    expect: 5,
+                    location: "test 1234 config 1234 1234 1234 foo".to_string(),
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1234", "56", "78", "foo", "bar"]));
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 5,
-                expect: 3,
-                location: "test 1234 56 78 foo".to_string(),
-            });
-
-            let result = should_err(
-                test_example_def(vec!["1234", "56", "config", "help", "78", "foo", "bar", "baz"])
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 5,
+                    expect: 3,
+                    location: "test 1234 56 78 foo".to_string(),
+                }
             );
-            assert_eq!(result, ArgumentError::TooMany {
-                found: 8,
-                expect: 5,
-                location: "test 1234 56 config help 78 foo".to_string(),
-            });
+
+            let result = should_err(test_example_def(vec![
+                "1234", "56", "config", "help", "78", "foo", "bar", "baz",
+            ]));
+            assert_eq!(
+                result,
+                ArgumentError::TooMany {
+                    found: 8,
+                    expect: 5,
+                    location: "test 1234 56 config help 78 foo".to_string(),
+                }
+            );
         }
 
         #[test]
         fn not_enough_args() {
             let result = should_err(test_example_def(vec!["1234", "config"]));
-            assert_eq!(result, ArgumentError::NotEnough {
-                found: 2,
-                expect: (5, "".to_string()),
-                location: "test 1234 config".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::NotEnough {
+                    found: 2,
+                    expect: (5, "".to_string()),
+                    location: "test 1234 config".to_string(),
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1234", "config", "56"]));
-            assert_eq!(result, ArgumentError::NotEnough {
-                found: 3,
-                expect: (5, "".to_string()),
-                location: "test 1234 config 56".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::NotEnough {
+                    found: 3,
+                    expect: (5, "".to_string()),
+                    location: "test 1234 config 56".to_string(),
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1234", "config", "56", "78"]));
-            assert_eq!(result, ArgumentError::NotEnough {
-                found: 4,
-                expect: (5, "".to_string()),
-                location: "test 1234 config 56 78".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::NotEnough {
+                    found: 4,
+                    expect: (5, "".to_string()),
+                    location: "test 1234 config 56 78".to_string(),
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1234", "56"]));
-            assert_eq!(result, ArgumentError::NotEnough {
-                found: 2,
-                expect: (3, "+".to_string()),
-                location: "test 1234 56".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::NotEnough {
+                    found: 2,
+                    expect: (3, "+".to_string()),
+                    location: "test 1234 56".to_string(),
+                }
+            );
         }
 
         #[test]
         fn invalid_args() {
             let result = should_err(Argument::parse(vec![format!("foo")], &Command::Help));
-            assert_eq!(result, ArgumentError::Invalid { location: "help foo".to_string() });
-
-            let result = should_err(
-                Argument::parse(vec![format!("foo"), format!("bar")], &Command::Help)
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "help foo".to_string()
+                }
             );
-            assert_eq!(result, ArgumentError::Invalid { location: "help foo".to_string() });
+
+            let result = should_err(Argument::parse(vec![format!("foo"), format!("bar")], &Command::Help));
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "help foo".to_string()
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1.1"]));
-            assert_eq!(result, ArgumentError::Invalid {
-                location: "test 1.1".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "test 1.1".to_string(),
+                }
+            );
             let result = should_err(test_example_def(vec!["config"]));
-            assert_eq!(result, ArgumentError::Invalid {
-                location: "test config".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "test config".to_string(),
+                }
+            );
 
             let result = should_err(test_example_def(vec!["1234", "1.1"]));
-            assert_eq!(result, ArgumentError::Invalid {
-                location: "test 1234 1.1".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "test 1234 1.1".to_string(),
+                }
+            );
             let result = should_err(test_example_def(vec!["1234", "foo"]));
-            assert_eq!(result, ArgumentError::Invalid {
-                location: "test 1234 foo".to_string(),
-            });
+            assert_eq!(
+                result,
+                ArgumentError::Invalid {
+                    location: "test 1234 foo".to_string(),
+                }
+            );
         }
 
         #[test]
@@ -701,22 +633,16 @@ mod arguments {
                 result,
                 Argument::Number(
                     1234,
-                    Box::new(
-                        Argument::Command(
-                            Command::Config,
-                            Box::new(
-                                Argument::Number(
-                                    12,
-                                    Box::new(
-                                        Argument::Number(
-                                            34,
-                                            Box::new(Argument::Number(56, Box::new(Argument::None)))
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
+                    Box::new(Argument::Command(
+                        Command::Config,
+                        Box::new(Argument::Number(
+                            12,
+                            Box::new(Argument::Number(
+                                34,
+                                Box::new(Argument::Number(56, Box::new(Argument::None)))
+                            ))
+                        ))
+                    ))
                 )
             );
             let result = test_example_def(vec!["12", "34", "56"]).unwrap();
@@ -724,12 +650,10 @@ mod arguments {
                 result,
                 Argument::Number(
                     12,
-                    Box::new(
-                        Argument::Number(
-                            34,
-                            Box::new(Argument::Number(56, Box::new(Argument::None)))
-                        )
-                    )
+                    Box::new(Argument::Number(
+                        34,
+                        Box::new(Argument::Number(56, Box::new(Argument::None)))
+                    ))
                 )
             );
             let result = test_example_def(vec!["12", "34", "stop"]).unwrap();
@@ -737,12 +661,10 @@ mod arguments {
                 result,
                 Argument::Number(
                     12,
-                    Box::new(
-                        Argument::Number(
-                            34,
-                            Box::new(Argument::Command(Command::Stop, Box::new(Argument::None)))
-                        )
-                    )
+                    Box::new(Argument::Number(
+                        34,
+                        Box::new(Argument::Command(Command::Stop, Box::new(Argument::None)))
+                    ))
                 )
             );
             let result = test_example_def(vec!["12", "34", "stop", "config"]).unwrap();
@@ -750,19 +672,13 @@ mod arguments {
                 result,
                 Argument::Number(
                     12,
-                    Box::new(
-                        Argument::Number(
-                            34,
-                            Box::new(
-                                Argument::Command(
-                                    Command::Stop,
-                                    Box::new(
-                                        Argument::Command(Command::Config, Box::new(Argument::None))
-                                    )
-                                )
-                            )
-                        )
-                    )
+                    Box::new(Argument::Number(
+                        34,
+                        Box::new(Argument::Command(
+                            Command::Stop,
+                            Box::new(Argument::Command(Command::Config, Box::new(Argument::None)))
+                        ))
+                    ))
                 )
             );
             let result = test_example_def(vec!["12", "34", "stop", "config", "56"]).unwrap();
@@ -770,22 +686,16 @@ mod arguments {
                 result,
                 Argument::Number(
                     12,
-                    Box::new(
-                        Argument::Number(
-                            34,
-                            Box::new(
-                                Argument::Command(
-                                    Command::Stop,
-                                    Box::new(
-                                        Argument::Command(
-                                            Command::Config,
-                                            Box::new(Argument::Number(56, Box::new(Argument::None)))
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
+                    Box::new(Argument::Number(
+                        34,
+                        Box::new(Argument::Command(
+                            Command::Stop,
+                            Box::new(Argument::Command(
+                                Command::Config,
+                                Box::new(Argument::Number(56, Box::new(Argument::None)))
+                            ))
+                        ))
+                    ))
                 )
             );
         }

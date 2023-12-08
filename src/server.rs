@@ -1,27 +1,51 @@
-use futures_util::Future;
+use futures_util::{Future, FutureExt, StreamExt};
 use std::fmt::Display;
 use std::str::FromStr;
-use warp::Filter;
+use warp::{reject::Rejection, Filter};
 
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 pub mod console;
 
-pub fn run_server(config: &ServerConfig) -> impl Future<Output = ()> {
+pub fn static_make() -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
     let images = warp::path("img").and(warp::fs::dir("./public/img"));
     let css = warp::path("css").and(warp::fs::dir("./public/css"));
     let js = warp::path("js").and(warp::fs::dir("./public/js"));
-    let routes = images
+    images
         .or(css)
         .or(js)
-        .or(warp::any().and(warp::fs::file("./public/pages/index.html")));
+        .or(warp::any().and(warp::fs::file("./public/pages/index.html"))) // Temporary static file serving
+}
 
+pub fn ws_make(
+    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
+    let ws_route = warp::path!("ws" / "echo")
+        .and(warp::ws())
+        .map(|ws: warp::filters::ws::Ws| {
+            ws.on_upgrade(|websocket| {
+                let (tx, rx) = websocket.split();
+                rx.forward(tx).map(|result| {
+                    if let Err(e) = result {
+                        eprintln!("websocket error: {:?}", e);
+                    }
+                })
+            })
+        });
+    ws_route.or(routes)
+}
+
+pub fn run_server(
+    config: &ServerConfig,
+    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
+) -> impl Future<Output = ()> {
     warp::serve(routes).run(config.addr)
 }
 
-pub fn run_tls_server(config: &ServerConfig) -> Result<impl Future<Output = ()>, ()> {
-    let routes = warp::any().map(|| "Hello, World!");
-
+pub fn run_tls_server(
+    config: &ServerConfig,
+    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
+) -> Result<impl Future<Output = ()>, ()> {
     match &config.tls {
         Some(tls) => Ok(warp::serve(routes)
             .tls()
