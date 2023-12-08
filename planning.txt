@@ -19,3 +19,17 @@ Routes:
 
 /ws/token
 /ws/echo
+
+------------------------
+
+Classes:
+
+class Move {
+  startPosition: Position
+  finalPosition: Position
+}
+
+class Position {
+  x: u8
+  y: u8
+}
