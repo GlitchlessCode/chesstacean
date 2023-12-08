@@ -378,6 +378,11 @@ div.game > nav svg:active {
 	scale: 0.95;
 }
 
+div.game > nav > div.options {
+	gap: 16px;
+	display: flex;
+}
+
 div.game > div.left {
 	display: flex;
 	flex-direction: column;
@@ -402,6 +407,9 @@ div.game > div.left > div.player > div.turn-marker {
 	width: var(--turn-marker-width);
 	height: 100%;
 
+	transition-property: all;
+	transition-duration: .2s;
+
 	border-top-right-radius: var(--turn-marker-border-radius);
 	border-bottom-right-radius: var(--turn-marker-border-radius);
 	background-color: var(--color-midbackground);
@@ -417,6 +425,9 @@ div.game > div.left > div.player > div.avatar {
 
 	grid-row: 1;
 	grid-column: 2;
+
+	transition-property: all;
+	transition-duration: .2s;
 
 	border-radius: 8px;
 	background-color: var(--color-midbackground);
@@ -447,22 +458,32 @@ div.game > div.left > div.player > div.user > div.handle {
 }
 
 div.game > div.left > div.player > div.clock {
+	--clock-border-width: 4px;
+
 	grid-row: 2;
 	grid-column: 2 / 5;
 
-	height: var(--game-margin);
 	margin-top: calc(var(--game-margin) / 2);
 
 	border-color: var(--color-midbackground);
 	border-style: solid;
-	border-width: 4px;
+	border-width: var(--clock-border-width);
 	border-radius: 8px;
+
+	transition-property: all;
+	transition-duration: .2s;
 
 	box-sizing: border-box;
 }
 
 div.game > div.left > div.player > div.clock > div {
-	height: 100%;
+	--vertical-padding: calc(7.5px - var(--clock-border-width));
+	--horizontal-padding: calc(10px - var(--clock-border-width));
+
+	transition-property: all;
+	transition-duration: .2s;
+
+	padding: var(--vertical-padding) var(--horizontal-padding);
 	background-color: var(--color-midbackground);
 }
 
@@ -472,6 +493,17 @@ div.game > div.left > div.player.active > div.clock {
 
 div.game > div.left > div.player.active > div.clock > div {
 	background-color: var(--color-accent);
+}
+
+div.game > div.left > div.player > div.clock > div > div {
+	font-size: 0.875rem;
+	font-family: var(--font-family);
+	font-weight: 900;
+
+	background-clip: text;
+	background-color: var(--color-background);
+
+	filter: invert(1);
 }
 
 div.game > div.left > div.player > svg {
@@ -496,6 +528,7 @@ div.game > div.left > div.player > svg:active {
 div.game > div.right {
 	grid-row: 2;
 	grid-column: 3;
+
 	margin-right: var(--game-margin);
 
 	overflow-y: scroll;
@@ -515,6 +548,7 @@ div.game > div.right > div {
 	justify-content: space-around;
 
 	padding: 24px;
+	min-width: 200px;
 	margin-bottom: 16px;
 
 	color: var(--color-midforeground);

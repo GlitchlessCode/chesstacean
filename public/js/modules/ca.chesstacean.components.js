@@ -17,8 +17,8 @@ export class Position {
 	y;
 
 	/**
-	 * @param {BigInt} x
-	 * @param {BigInt} y
+	 * @param {number} x
+	 * @param {number} y
 	 */
 	constructor(x, y) {
 		this.x = x;

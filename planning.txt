@@ -28,6 +28,6 @@ class Move {
 }
 
 class Position {
-  x: i64
-  y: i64
+  x: u8
+  y: u8
 }
