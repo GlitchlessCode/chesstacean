@@ -182,6 +182,7 @@ main > div.topleft > div.head > div.left > div > button > div:active {
 		translate: -32px 0;
 
 		background-size: 75%;
+		background-size: min(75%, 220px);
 		background-image: url('/img/mascot.png');
 		background-repeat: no-repeat;
 		background-position: 50% bottom;
@@ -320,7 +321,7 @@ main > div.right > div.stats {
 	background-color: var(--color-midbackground);
 }
 
-div.game {
+#game-window {
 	--game-margin: 32px;
 	--canvas-size: calc(100vh - 2/10 * 100vw);
 
@@ -342,13 +343,13 @@ div.game {
 	background-color: var(--color-background);
 }
 
-div.game.active {
+#game-window.active {
 	scale: 1;
 	opacity: 1;
 	z-index: 1;
 }
 
-div.game > nav {
+#game-window > nav {
 	grid-row: 1;
 	grid-column: 1 / 4;
 
@@ -358,7 +359,7 @@ div.game > nav {
 	justify-content: space-between;
 }
 
-div.game > nav svg {
+#game-window > nav svg {
 	width: 32px;
 	aspect-ratio: 1/1;
 
@@ -370,26 +371,28 @@ div.game > nav svg {
 	user-select: none;
 }
 
-div.game > nav svg:hover {
+#game-window > nav svg:hover {
 	fill: var(--color-accent);
 }
 
-div.game > nav svg:active {
+#game-window > nav svg:active {
 	scale: 0.95;
 }
 
-div.game > nav > div.options {
+#game-window > nav > div.options {
 	gap: 16px;
 	display: flex;
 }
 
-div.game > div.left {
+#game-window > div.left {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
+
+	max-width: 350px;
 }
 
-div.game > div.left > div.player {
+#game-window > div.left > div.player {
 	--avatar-size: calc(var(--game-margin) * 2);
 
 	display: grid;
@@ -397,7 +400,7 @@ div.game > div.left > div.player {
 	grid-template-columns: var(--game-margin) var(--avatar-size) 1fr min-content;
 }
 
-div.game > div.left > div.player > div.turn-marker {
+#game-window > div.left > div.player > div.turn-marker {
 	--turn-marker-width: calc(var(--game-margin) / 4);
 	--turn-marker-border-radius: calc(var(--turn-marker-width) / 2);
 
@@ -415,11 +418,11 @@ div.game > div.left > div.player > div.turn-marker {
 	background-color: var(--color-midbackground);
 }
 
-div.game > div.left > div.player.active > div.turn-marker {
+#game-window > div.left > div.player.active > div.turn-marker {
 	background-color: var(--color-accent);
 }
 
-div.game > div.left > div.player > div.avatar {
+#game-window > div.left > div.player > div.avatar {
 	width: 100%;
 	aspect-ratio: 1/1;
 
@@ -433,11 +436,11 @@ div.game > div.left > div.player > div.avatar {
 	background-color: var(--color-midbackground);
 }
 
-div.game > div.left > div.player.active > div.avatar {
+#game-window > div.left > div.player.active > div.avatar {
 	background-color: var(--color-accent);
 }
 
-div.game > div.left > div.player > div.user {
+#game-window > div.left > div.player > div.user {
 	font-family: var(--font-family);
 	font-weight: 500;
 
@@ -447,17 +450,17 @@ div.game > div.left > div.player > div.user {
 	margin: 0 calc(var(--game-margin) / 2);
 }
 
-div.game > div.left > div.player > div.user > div.displayname {
+#game-window > div.left > div.player > div.user > div.displayname {
 	color: var(--color-foreground);
 	font-size: 1.125rem;
 }
 
-div.game > div.left > div.player > div.user > div.handle {
+#game-window > div.left > div.player > div.user > div.handle {
 	color: var(--color-midforeground);
 	font-size: 1rem;
 }
 
-div.game > div.left > div.player > div.clock {
+#game-window > div.left > div.player > div.clock {
 	--clock-border-width: 4px;
 
 	grid-row: 2;
@@ -476,7 +479,7 @@ div.game > div.left > div.player > div.clock {
 	box-sizing: border-box;
 }
 
-div.game > div.left > div.player > div.clock > div {
+#game-window > div.left > div.player > div.clock > div {
 	--vertical-padding: calc(7.5px - var(--clock-border-width));
 	--horizontal-padding: calc(10px - var(--clock-border-width));
 
@@ -487,26 +490,27 @@ div.game > div.left > div.player > div.clock > div {
 	background-color: var(--color-midbackground);
 }
 
-div.game > div.left > div.player.active > div.clock {
+#game-window > div.left > div.player.active > div.clock {
 	border-color: var(--color-accent);
 }
 
-div.game > div.left > div.player.active > div.clock > div {
+#game-window > div.left > div.player.active > div.clock > div {
 	background-color: var(--color-accent);
 }
 
-div.game > div.left > div.player > div.clock > div > div {
+#game-window > div.left > div.player > div.clock > div > div {
 	font-size: 0.875rem;
 	font-family: var(--font-family);
 	font-weight: 900;
 
 	background-clip: text;
 	background-color: var(--color-background);
+	-webkit-background-clip: text;
 
 	filter: invert(1);
 }
 
-div.game > div.left > div.player > svg {
+#game-window > div.left > div.player > svg {
 	width: 24px;
 	cursor: pointer;
 	aspect-ratio: 1/1;
@@ -517,15 +521,15 @@ div.game > div.left > div.player > svg {
 	fill: var(--color-foreground);
 }
 
-div.game > div.left > div.player > svg:hover {
+#game-window > div.left > div.player > svg:hover {
 	fill: var(--color-accent);
 }
 
-div.game > div.left > div.player > svg:active {
+#game-window > div.left > div.player > svg:active {
 	scale: .85;
 }
 
-div.game > div.right {
+#game-window > div.right {
 	grid-row: 2;
 	grid-column: 3;
 
@@ -534,11 +538,11 @@ div.game > div.right {
 	overflow-y: scroll;
 }
 
-div.game > div.right::-webkit-scrollbar {
+#game-window > div.right::-webkit-scrollbar {
 	display: none;
 }
 
-div.game > div.right > div {
+#game-window > div.right > div {
 	font-size: 24px;
 	font-family: var(--font-family);
 	font-weight: 500;
@@ -548,7 +552,9 @@ div.game > div.right > div {
 	justify-content: space-around;
 
 	padding: 24px;
+	margin-left: auto;
 	min-width: 200px;
+	max-width: 250px;
 	margin-bottom: 16px;
 
 	color: var(--color-midforeground);
@@ -556,7 +562,7 @@ div.game > div.right > div {
 	background-color: var(--color-midbackground);
 }
 
-div.game > div.right > div > svg {
+#game-window > div.right > div > svg {
 	width: 24px;
 	cursor: pointer;
 	aspect-ratio: 1/1;
@@ -564,20 +570,20 @@ div.game > div.right > div > svg {
 	fill: var(--color-midforeground);
 }
 
-div.game > div.right > div > svg:last-child {
+#game-window > div.right > div > svg:last-child {
 	transition-duration: .2s;
 	transition-property: all;
 }
 
-div.game > div.right > div > svg:last-child:hover {
+#game-window > div.right > div > svg:last-child:hover {
 	fill: var(--color-accent);
 }
 
-div.game > div.right > div > svg:last-child:active {
+#game-window > div.right > div > svg:last-child:active {
 	scale: .85;
 }
 
-div.game > div.footer {
+#game-window > div.footer {
 	grid-row: 3;
 	grid-column: 1 / 4;
 
@@ -587,7 +593,7 @@ div.game > div.footer {
 	justify-content: right;
 }
 
-div.game > div.footer > svg {
+#game-window > div.footer > svg {
 	width: 32px;
 	aspect-ratio: 1/1;
 
@@ -601,11 +607,11 @@ div.game > div.footer > svg {
 	cursor: pointer;
 }
 
-div.game > div.footer > svg:hover {
+#game-window > div.footer > svg:hover {
 	fill: var(--color-accent);
 }
 
-div.game > div.footer > svg:active {
+#game-window > div.footer > svg:active {
 	scale: .85;
 }
 
