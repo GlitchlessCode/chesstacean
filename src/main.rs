@@ -1,5 +1,6 @@
-use chesstacean::server::{self, ServerConfig};
+use chesstacean::server::{ self, ServerConfig, database };
 use std::env;
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
@@ -8,7 +9,11 @@ async fn main() {
 
     let config = ServerConfig::build(args).unwrap_or(ServerConfig::new([127, 0, 0, 1], 3000, None));
 
-    let routes = server::ws_make(server::static_make());
+    let (tx, _rx) = mpsc::channel(1);
+
+    let routes = server::ws_make(server::static_make(), tx);
+
+    database::start();
 
     match config.tls {
         Some(_) => {
