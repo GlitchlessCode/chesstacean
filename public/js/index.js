@@ -1,4 +1,5 @@
 import "./modules/ca.chesstacean.components.js";
+import "./web-components/registry.js";
 
 const gameWindow = document.getElementById("game-window");
 
@@ -9,4 +10,3 @@ window.openGameWindow = () => {
 window.closeGameWindow = () => {
 	gameWindow.classList.remove("active");
 }
-

@@ -11,7 +11,9 @@ Crates (Packages) to use:
   Interface for SQLite RDBMS
 
 Routes:
-/static/..
+/css/...
+/js/...
+/img/...
 /
 /match/:id
 
