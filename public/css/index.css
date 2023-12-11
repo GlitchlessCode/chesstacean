@@ -1,184 +1,184 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap");
 
 :root {
-  --font-family: "Inter", sans-serif;
+	--font-family: "Inter", sans-serif;
 
-  --color-accent: #ff582f;
-  --color-foreground: #dddddd;
-  --color-midforeground: #666666;
-  --color-midbackground: #101010;
-  --color-background: #000000;
+	--color-accent: #ff582f;
+	--color-foreground: #dddddd;
+	--color-midforeground: #666666;
+	--color-midbackground: #101010;
+	--color-background: #000000;
 
-  --header-height: 256px;
+	--header-height: 256px;
 }
 
 body {
-  margin: 0;
-  height: 100vh;
+	margin: 0;
+	height: 100vh;
 
-  display: grid;
-  grid-template-rows: auto 1fr;
+	display: grid;
+	grid-template-rows: auto 1fr;
 
-  background-color: var(--color-background);
+	background-color: var(--color-background);
 }
 
 body > nav {
-  padding: 64px;
-  user-select: none;
+	padding: 64px;
+	user-select: none;
 }
 
 body > nav div.left {
-  font-size: 1rem;
-  font-family: var(--font-family);
+	font-size: 1rem;
+	font-family: var(--font-family);
 
-  color: var(--color-foreground);
-  float: left;
-  cursor: pointer;
+	color: var(--color-foreground);
+	float: left;
+	cursor: pointer;
 }
 
 body > nav div.right {
-  float: right;
+	float: right;
 }
 
 body > nav div.left img {
-  width: 32px;
-  aspect-ratio: 1/1;
-  margin-right: 16px;
+	width: 32px;
+	aspect-ratio: 1/1;
+	margin-right: 16px;
 }
 
 body > nav div.right svg {
-  fill: var(--color-midforeground);
-  cursor: pointer;
-  margin-left: 16px;
+	fill: var(--color-midforeground);
+	cursor: pointer;
+	margin-left: 16px;
 
-  transition-duration: 0.2s;
-  transition-property: all;
+	transition-duration: 0.2s;
+	transition-property: all;
 }
 
 body > nav div.right svg:hover {
-  fill: var(--color-accent);
+	fill: var(--color-accent);
 }
 
 body > nav div.right svg:active {
-  scale: 0.85;
+	scale: 0.85;
 }
 
 main {
-  min-height: 100%;
+	min-height: 100%;
 
-  display: grid;
-  grid-template-rows: auto 1fr;
-  grid-template-columns: 2fr 1fr;
+	display: grid;
+	grid-template-rows: auto 1fr;
+	grid-template-columns: 2fr 1fr;
 }
 
 main > div.topleft {
-  grid-row: 1;
-  grid-column: 1;
+	grid-row: 1;
+	grid-column: 1;
 
-  margin: 0 64px;
+	margin: 0 64px;
 }
 
 main > div.bottomleft {
-  grid-row: 2;
-  grid-column: 1;
+	grid-row: 2;
+	grid-column: 1;
 
-  margin: 0 64px;
-  min-height: 100%;
+	margin: 0 64px;
+	min-height: 100%;
 }
 
 main > div.right {
-  --space-between: 32px;
+	--space-between: 32px;
 
-  grid-row: 1 / 2;
-  grid-column: 2;
+	grid-row: 1 / 2;
+	grid-column: 2;
 
-  margin-right: 64px;
+	margin-right: 64px;
 }
 
 main > div.topleft > div.head {
-  height: var(--header-height);
-  margin-bottom: 64px;
+	height: var(--header-height);
+	margin-bottom: 64px;
 
-  background-image: url("/img/header-bg.png");
-  background-size: 100% 100%;
+	background-image: url("/img/header-bg.png");
+	background-size: 100% 100%;
 
-  display: flex;
-  user-select: none;
-  border-radius: 20px;
-  background-color: var(--color-midbackground);
+	display: flex;
+	user-select: none;
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
 }
 
 main > div.topleft > div.head > div.left {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
 
-  padding: 0 64px;
+	padding: 0 64px;
 }
 
 main > div.topleft > div.head > div.left > h1 {
-  font-size: 32px;
-  font-family: var(--font-family);
-  font-weight: 900;
+	font-size: 32px;
+	font-family: var(--font-family);
+	font-weight: 900;
 
-  color: var(--color-foreground);
+	color: var(--color-foreground);
 }
 
 main > div.topleft > div.head > div.left > div {
-  gap: 8px;
-  display: flex;
+	gap: 8px;
+	display: flex;
 }
 
 main > div.topleft > div.head > div.left > div > button {
-  --border-radius: 10px;
+	--border-radius: 10px;
 
-  width: 128px;
-  height: 48px;
+	width: 128px;
+	height: 48px;
 
-  font-size: 0.875rem;
-  font-family: var(--font-family);
-  font-weight: 900;
+	font-size: 0.875rem;
+	font-family: var(--font-family);
+	font-weight: 900;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  color: var(--color-foreground);
-  cursor: pointer;
-  border-style: none;
-  background-color: var(--color-background);
+	color: var(--color-foreground);
+	cursor: pointer;
+	border-style: none;
+	background-color: var(--color-background);
 }
 
 main > div.topleft > div.head > div.left > div > button:hover {
-  color: var(--color-background);
-  background-color: var(--color-accent);
+	color: var(--color-background);
+	background-color: var(--color-accent);
 }
 
 main > div.topleft > div.head > div.left > div > button:first-child {
-  border-top-left-radius: var(--border-radius);
-  border-bottom-left-radius: var(--border-radius);
+	border-top-left-radius: var(--border-radius);
+	border-bottom-left-radius: var(--border-radius);
 }
 
 main > div.topleft > div.head > div.left > div > button:last-child {
-  border-top-right-radius: var(--border-radius);
-  border-bottom-right-radius: var(--border-radius);
+	border-top-right-radius: var(--border-radius);
+	border-bottom-right-radius: var(--border-radius);
 }
 
 main > div.topleft > div.head > div.left > div > button > div {
-  width: 100%;
-  height: 100%;
+	width: 100%;
+	height: 100%;
 
-  display: grid;
-  place-items: center;
+	display: grid;
+	place-items: center;
 }
 
 main > div.topleft > div.head > div.left > div > button > div:active {
-  scale: 0.85;
+	scale: 0.85;
 }
 
 @media (min-width: 1150px) {
-  main > div.topleft > div.head > div.right {
-    flex-grow: 1;
-    translate: -32px 0;
+	main > div.topleft > div.head > div.right {
+		flex-grow: 1;
+		translate: -32px 0;
 
 		background-size: min(75%, 220px);
 		background-image: url('/img/mascot.png');
@@ -188,157 +188,168 @@ main > div.topleft > div.head > div.left > div > button > div:active {
 }
 
 main > div.bottomleft > div.card-container {
-  height: 100%;
-  overflow-y: scroll;
+	height: 100%;
+	overflow-y: scroll;
 }
 
 main > div.bottomleft div.card-container::-webkit-scrollbar {
-  display: none;
+	display: none;
 }
 
 main > div.bottomleft > div.card-container > div.card {
-  font-size: 0.875rem;
-  font-family: var(--font-family);
+	font-size: 0.875rem;
+	font-family: var(--font-family);
 
-  padding: 10px;
-  margin-bottom: 8px;
+	padding: 10px;
+	margin-bottom: 8px;
 
-  gap: 10px;
-  display: grid;
-  align-items: center;
-  grid-template-columns: auto 1fr auto auto;
+	gap: 10px;
+	display: grid;
+	align-items: center;
+	grid-template-columns: auto 1fr auto auto;
 
-  color: var(--color-foreground);
-  user-select: none;
-  border-radius: 20px;
-  background-color: var(--color-midbackground);
+	color: var(--color-foreground);
+	user-select: none;
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
 }
 
 main > div.bottomleft > div.card-container > div.card:last-child {
-  margin-bottom: 64px;
+	margin-bottom: 64px;
 }
 
 main > div.bottomleft > div.card-container > div.card.inactive div.icon-container,
 main > div.bottomleft > div.card-container > div.card.inactive div.info-container {
-  filter: brightness(50%);
+	filter: brightness(50%);
 }
 
 main > div.bottomleft > div.card-container > div.card > div.icon-container {
-  width: min-content;
-  height: min-content;
-  padding: 10px;
+	width: min-content;
+	height: min-content;
+	padding: 10px;
 
-  line-height: 0;
-  border-radius: 10px;
-  background-color: var(--color-background);
+	line-height: 0;
+	border-radius: 10px;
+	background-color: var(--color-background);
 }
 
 main > div.bottomleft > div.card-container > div.card > div.info-container {
-  height: min-content;
-  margin-left: 10px;
+	height: min-content;
+	margin-left: 10px;
 }
 
 main > div.bottomleft > div.card-container > div.card > div.info-container span {
-  font-weight: bold;
+	font-weight: bold;
 }
 
 main > div.bottomleft > div.card-container > div.card > button {
-  font-size: 0.875rem;
-  font-weight: 900;
-  font-family: var(--font-family);
+	font-size: 0.875rem;
+	font-weight: 900;
+	font-family: var(--font-family);
 
-  width: 80px;
-  height: 100%;
+	width: 80px;
+	height: 100%;
 
-  border-style: none;
-  border-radius: 10px;
+	border-style: none;
+	border-radius: 10px;
 
-  transition-duration: 0.2s;
-  transition-property: all;
+	transition-duration: 0.2s;
+	transition-property: all;
 
-  color: var(--color-foreground);
-  cursor: pointer;
-  background-color: var(--color-background);
+	color: var(--color-foreground);
+	cursor: pointer;
+	background-color: var(--color-background);
 }
 
 main > div.bottomleft > div.card-container > div.card > svg {
-  width: 24px;
-  aspect-ratio: 1/1;
+	width: 24px;
+	aspect-ratio: 1/1;
 
-  fill: var(--color-foreground);
-  cursor: pointer;
-  padding-right: 8px;
+	transition-duration: .2s;
+	transition-property: all;
+
+	fill: var(--color-foreground);
+	cursor: pointer;
+	padding-right: 8px;
+}
+
+main > div.bottomleft > div.card-container > div.card > svg:hover {
+	fill: var(--color-accent);
+}
+
+main > div.bottomleft > div.card-container > div.card > svg:active {
+	scale: 0.85;
 }
 
 main > div.bottomleft > div.card-container > div.card button:hover {
-  color: var(--color-accent);
+	color: var(--color-accent);
 }
 
 main > div.bottomleft > div.card-container > div.card button > div {
-  width: 100%;
-  height: 100%;
+	width: 100%;
+	height: 100%;
 
-  display: grid;
-  place-items: center;
+	display: grid;
+	place-items: center;
 }
 
 main > div.bottomleft > div.card-container > div.card button:active > div {
-  scale: 0.85;
+	scale: 0.85;
 }
 
 main > div.bottomleft > div.card-container > div.card img {
-  width: 20px;
+	width: 20px;
 }
 
 main > div.right > div.profiles {
-  height: calc((var(--header-height) - var(--space-between)) * 1 / 5);
-  margin-bottom: var(--space-between);
+	height: calc((var(--header-height) - var(--space-between)) * 1 / 5);
+	margin-bottom: var(--space-between);
 
-  display: flex;
+	display: flex;
 }
 
 main > div.right > div.profiles > div.search {
-  flex-grow: 1;
+	flex-grow: 1;
 
-  border-radius: 20px;
-  background-color: var(--color-midbackground);
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
 }
 
 main > div.right > div.profiles > div.avatar {
-  height: 100%;
-  margin-left: 16px;
-  aspect-ratio: 1/1;
+	height: 100%;
+	margin-left: 16px;
+	aspect-ratio: 1/1;
 
-  border-radius: 100%;
-  background-color: var(--color-midbackground);
+	border-radius: 100%;
+	background-color: var(--color-midbackground);
 }
 
 main > div.right > div.stats {
-  height: calc((var(--header-height) - var(--space-between)) * 4 / 5);
-  border-radius: 20px;
-  background-color: var(--color-midbackground);
+	height: calc((var(--header-height) - var(--space-between)) * 4 / 5);
+	border-radius: 20px;
+	background-color: var(--color-midbackground);
 }
 
 #game-window {
 	--game-margin: 32px;
 	--canvas-size: calc(100vh - 2/10 * 100vw);
 
-  width: 100vw;
-  height: 100vh;
+	width: 100vw;
+	height: 100vh;
 
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  grid-template-columns: 1fr 50vw 1fr;
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+	grid-template-columns: 1fr 50vw 1fr;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  scale: 0.85;
-  opacity: 0;
-  z-index: -1;
-  position: absolute;
-  user-select: none;
-  background-color: var(--color-background);
+	scale: 0.85;
+	opacity: 0;
+	z-index: -1;
+	position: absolute;
+	user-select: none;
+	background-color: var(--color-background);
 }
 
 #game-window.active {
@@ -351,22 +362,22 @@ main > div.right > div.stats {
 	grid-row: 1;
 	grid-column: 1 / 4;
 
-  margin: 64px var(--game-margin);
+	margin: 64px var(--game-margin);
 
-  display: flex;
-  justify-content: space-between;
+	display: flex;
+	justify-content: space-between;
 }
 
 #game-window > nav svg {
 	width: 32px;
 	aspect-ratio: 1/1;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  fill: var(--color-midforeground);
-  cursor: pointer;
-  user-select: none;
+	fill: var(--color-midforeground);
+	cursor: pointer;
+	user-select: none;
 }
 
 #game-window > nav svg:hover {
@@ -393,27 +404,27 @@ main > div.right > div.stats {
 #game-window > div.left > div.player {
 	--avatar-size: calc(var(--game-margin) * 2);
 
-  display: grid;
-  grid-template-rows: var(--avatar-size) 1fr;
-  grid-template-columns: var(--game-margin) var(--avatar-size) 1fr min-content;
+	display: grid;
+	grid-template-rows: var(--avatar-size) 1fr;
+	grid-template-columns: var(--game-margin) var(--avatar-size) 1fr min-content;
 }
 
 #game-window > div.left > div.player > div.turn-marker {
 	--turn-marker-width: calc(var(--game-margin) / 4);
 	--turn-marker-border-radius: calc(var(--turn-marker-width) / 2);
 
-  grid-row: 1 / 3;
-  grid-column: 1;
+	grid-row: 1 / 3;
+	grid-column: 1;
 
-  width: var(--turn-marker-width);
-  height: 100%;
+	width: var(--turn-marker-width);
+	height: 100%;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  border-top-right-radius: var(--turn-marker-border-radius);
-  border-bottom-right-radius: var(--turn-marker-border-radius);
-  background-color: var(--color-midbackground);
+	border-top-right-radius: var(--turn-marker-border-radius);
+	border-bottom-right-radius: var(--turn-marker-border-radius);
+	background-color: var(--color-midbackground);
 }
 
 #game-window > div.left > div.player.active > div.turn-marker {
@@ -424,14 +435,14 @@ main > div.right > div.stats {
 	width: 100%;
 	aspect-ratio: 1/1;
 
-  grid-row: 1;
-  grid-column: 2;
+	grid-row: 1;
+	grid-column: 2;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  border-radius: 8px;
-  background-color: var(--color-midbackground);
+	border-radius: 8px;
+	background-color: var(--color-midbackground);
 }
 
 #game-window > div.left > div.player.active > div.avatar {
@@ -442,10 +453,10 @@ main > div.right > div.stats {
 	font-family: var(--font-family);
 	font-weight: 500;
 
-  grid-row: 1;
-  grid-column: 3;
+	grid-row: 1;
+	grid-column: 3;
 
-  margin: 0 calc(var(--game-margin) / 2);
+	margin: 0 calc(var(--game-margin) / 2);
 }
 
 #game-window > div.left > div.player > div.user > div.displayname {
@@ -461,31 +472,31 @@ main > div.right > div.stats {
 #game-window > div.left > div.player > div.clock {
 	--clock-border-width: 4px;
 
-  grid-row: 2;
-  grid-column: 2 / 5;
+	grid-row: 2;
+	grid-column: 2 / 5;
 
-  margin-top: calc(var(--game-margin) / 2);
+	margin-top: calc(var(--game-margin) / 2);
 
-  border-color: var(--color-midbackground);
-  border-style: solid;
-  border-width: var(--clock-border-width);
-  border-radius: 8px;
+	border-color: var(--color-midbackground);
+	border-style: solid;
+	border-width: var(--clock-border-width);
+	border-radius: 8px;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 #game-window > div.left > div.player > div.clock > div {
 	--vertical-padding: calc(7.5px - var(--clock-border-width));
 	--horizontal-padding: calc(10px - var(--clock-border-width));
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  padding: var(--vertical-padding) var(--horizontal-padding);
-  background-color: var(--color-midbackground);
+	padding: var(--vertical-padding) var(--horizontal-padding);
+	background-color: var(--color-midbackground);
 }
 
 #game-window > div.left > div.player.active > div.clock {
@@ -505,7 +516,7 @@ main > div.right > div.stats {
 	background-color: var(--color-background);
 	-webkit-background-clip: text;
 
-  filter: invert(1);
+	filter: invert(1);
 }
 
 #game-window > div.left > div.player > svg {
@@ -513,10 +524,10 @@ main > div.right > div.stats {
 	cursor: pointer;
 	aspect-ratio: 1/1;
 
-  transition-property: all;
-  transition-duration: 0.2s;
+	transition-property: all;
+	transition-duration: 0.2s;
 
-  fill: var(--color-foreground);
+	fill: var(--color-foreground);
 }
 
 #game-window > div.left > div.player > svg:hover {
@@ -531,37 +542,37 @@ main > div.right > div.stats {
 	grid-row: 2;
 	grid-column: 3;
 
-  margin-right: var(--game-margin);
+	margin-right: var(--game-margin);
 
-  overflow-y: scroll;
+	overflow-y: scroll;
 }
 
 #game-window > div.right::-webkit-scrollbar {
-  display: none;
+	display: none;
 }
 
 #game-window > div.footer {
-  grid-row: 3;
-  grid-column: 1 / 4;
+	grid-row: 3;
+	grid-column: 1 / 4;
 
-  margin: var(--game-margin);
-  display: flex;
-  align-items: end;
-  justify-content: right;
+	margin: var(--game-margin);
+	display: flex;
+	align-items: end;
+	justify-content: right;
 }
 
 #game-window > div.footer > svg {
 	width: 32px;
 	aspect-ratio: 1/1;
 
-  grid-row: 1;
-  grid-column: 4;
+	grid-row: 1;
+	grid-column: 4;
 
-  transition-duration: 0.2s;
-  transition-property: all;
+	transition-duration: 0.2s;
+	transition-property: all;
 
-  fill: var(--color-midforeground);
-  cursor: pointer;
+	fill: var(--color-midforeground);
+	cursor: pointer;
 }
 
 #game-window > div.footer > svg:hover {
