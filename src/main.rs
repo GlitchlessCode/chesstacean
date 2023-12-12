@@ -1,4 +1,4 @@
-use chesstacean::server::{ self, ServerConfig, database };
+use chesstacean::server::{self, database, ServerConfig};
 use std::env;
 use tokio::sync::mpsc;
 
