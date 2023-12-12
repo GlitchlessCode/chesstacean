@@ -1,18 +1,29 @@
-use rusqlite::{config::DbConfig, Connection, Row};
+use rusqlite::{config::DbConfig, Connection, Row, Statement};
 use std::fs;
 
 // CREATE TABLE IF NOT EXISTS users (
-//         id INTEGER PRIMARY KEY,
-//         handle TEXT NOT NULL UNIQUE,
-//         display TEXT NOT NULL
+//      id INTEGER PRIMARY KEY,
+//      handle TEXT NOT NULL UNIQUE,
+//      display TEXT NOT NULL,
+//      salt TEXT NOT NULL,
+//      digest TEXT NOT NULL
 // );
 
 // CREATE TABLE IF NOT EXISTS games (
-//         black INTEGER NOT NULL,
-//         white INTEGER NOT NULL,
-//         moves TEXT,
-//         CONSTRAINT fk_black FOREIGN KEY (black) REFERENCES users(id),
-//         CONSTRAINT fk_white FOREIGN KEY (white) REFERENCES users(id)
+//      id INTEGER PRIMARY KEY,
+//      black INTEGER NOT NULL,
+//      white INTEGER NOT NULL,
+//      moves TEXT,
+//      CONSTRAINT fk_black FOREIGN KEY (black) REFERENCES users(id),
+//      CONSTRAINT fk_white FOREIGN KEY (white) REFERENCES users(id)
+// );
+
+// CREATE TABLE IF NOT EXISTS sessions (
+//      id INTEGER PRIMARY KEY,
+//      cookie TEXT NOT NULL UNIQUE,
+//      user INTEGER NOT NULL,
+//      invalid INTEGER NOT NULL DEFAULT 0,
+//      CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
 // );
 
 pub fn start() {
@@ -24,7 +35,12 @@ pub fn start() {
 
     database
         .set_db_config(DbConfig::SQLITE_DBCONFIG_ENABLE_FKEY, true)
-        .expect("Could not configure database");
+        .expect("Failed to configure database");
+
+    match create_tables(&database) {
+        Err(e) => eprintln!("\x1b[1;31m{e}\x1b[0m\n"),
+        Ok(_) => (),
+    }
 
     // Checking to see if table is correct
     // let query = TableInfo::from_query(database, "users");
@@ -36,7 +52,7 @@ pub fn start() {
     // }
 
     // TableInfo {
-    //     name: "users".to_owned(),
+    //     name: "users",
     //     columns: vec![
     //         ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
     //         ColumnInfo::default().name("handle").kind("TEXT").not_null(true),
@@ -54,6 +70,104 @@ pub fn start() {
     // };
 }
 
+fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
+    attempt_create(database)?;
+    let mut stmnt = database.prepare("DROP TABLE ?1")?;
+    for table in get_tables().iter() {
+        verify_table(database, table, &mut stmnt)?;
+    }
+    attempt_create(database)?;
+
+    Ok(())
+}
+
+fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        handle TEXT NOT NULL UNIQUE,
+        display TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        digest TEXT NOT NULL
+   );",
+        [],
+    )?;
+
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS games (
+        id INTEGER PRIMARY KEY,
+        black INTEGER NOT NULL,
+        white INTEGER NOT NULL,
+        moves TEXT,
+        CONSTRAINT fk_black FOREIGN KEY (black) REFERENCES users(id),
+        CONSTRAINT fk_white FOREIGN KEY (white) REFERENCES users(id)
+       );",
+        [],
+    )?;
+
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY,
+            cookie TEXT NOT NULL UNIQUE,
+            user INTEGER NOT NULL,
+            invalid INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
+       );",
+        [],
+    )?;
+
+    Ok(())
+}
+
+fn get_tables() -> Vec<TableInfo> {
+    let mut tables = Vec::new();
+
+    tables.push(TableInfo {
+        name: "users".to_owned(),
+        columns: vec![
+            ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("handle").not_null(true),
+            ColumnInfo::default().name("display").not_null(true),
+            ColumnInfo::default().name("salt").not_null(true),
+            ColumnInfo::default().name("digest").not_null(true),
+        ],
+    });
+
+    tables.push(TableInfo {
+        name: "games".to_owned(),
+        columns: vec![
+            ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("black").kind("INTEGER").not_null(true),
+            ColumnInfo::default().name("white").kind("INTEGER").not_null(true),
+            ColumnInfo::default().name("moves"),
+        ],
+    });
+
+    tables.push(TableInfo {
+        name: "sessions".to_owned(),
+        columns: vec![
+            ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("cookie").not_null(true),
+            ColumnInfo::default().name("display").not_null(true),
+            ColumnInfo::default().name("salt").not_null(true),
+            ColumnInfo::default().name("digest").not_null(true),
+        ],
+    });
+
+    tables
+}
+
+fn verify_table(database: &Connection, template: &TableInfo, dropper: &mut Statement) -> Result<(), rusqlite::Error> {
+    let table = TableInfo::from_query(database, &template.name)?;
+    if template == &table {
+        Ok(())
+    } else {
+        dropper.execute([table.name])?;
+        eprintln!("\x1b[1;31mDropped TABLE {}\x1b[0m\n", &template.name);
+        Ok(())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct TableInfo {
     name: String,
@@ -61,7 +175,7 @@ struct TableInfo {
 }
 
 impl TableInfo {
-    fn from_query(db: Connection, query_str: &str) -> Result<Self, rusqlite::Error> {
+    fn from_query(db: &Connection, query_str: &str) -> Result<Self, rusqlite::Error> {
         let mut statement = db.prepare_cached("SELECT * FROM pragma_table_info(?1)").unwrap();
         let query = statement.query([query_str]);
         let mapped_query = query?.mapped(|row| Ok(ColumnInfo::from_row(row)?));
@@ -110,8 +224,8 @@ impl ColumnInfo {
         })
     }
 
-    fn name(mut self, kind: &str) -> Self {
-        self.name = kind.to_owned();
+    fn name(mut self, name: &str) -> Self {
+        self.name = name.to_owned();
         self
     }
 
