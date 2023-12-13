@@ -4,6 +4,8 @@ use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
+    eprint!("\x1b[2J");
+
     let mut args = env::args();
     args.next();
 
@@ -11,7 +13,7 @@ async fn main() {
 
     let (tx, _rx) = mpsc::channel(1);
 
-    let routes = server::ws_make(server::static_make(), tx);
+    let routes = server::ws_make(server::page_make(server::static_make()), tx);
 
     database::start();
 

@@ -22,7 +22,7 @@ mod console {
         }
 
         pub fn start(&self) {
-            eprintln!("\x1b[2J\x1b[1;4mChesstacean Console v1.1.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m");
+            eprintln!("\n\n\n\x1b[1;4mChesstacean Console v1.1.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m");
             loop {
                 // Take Input
                 eprint!(" > ");
