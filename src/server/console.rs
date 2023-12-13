@@ -2,11 +2,10 @@ use super::ServerConfig;
 use arguments::Argument;
 use command::Command;
 use console::Console;
-use std::{ fmt::Display, io, str::FromStr, slice::Iter, cell::RefCell, vec };
+use std::{ cell::RefCell, fmt::Display, io, slice::Iter, str::FromStr, vec };
 
 pub fn start(config: ServerConfig) {
-    let console = Console::new(config);
-    console.start()
+    Console::new(config).start();
 }
 
 mod console {
@@ -24,7 +23,7 @@ mod console {
 
         pub fn start(&self) {
             eprintln!(
-                "\x1b[2J\x1b[1;4mChesstacean Console v1.0.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m"
+                "\x1b[2J\x1b[1;4mChesstacean Console v1.1.0\x1b[0m\n\x1b[1mUse \"help\" for help\n\x1b[0m"
             );
             loop {
                 // Take Input
@@ -51,12 +50,11 @@ mod console {
         fn process_command(&self, (cmd, args): (Option<String>, Vec<String>)) -> Option<String> {
             eprint!("\x1b[1m"); // Bold
             match Command::parse(cmd) {
-                Ok(command) => {
+                Ok(command) =>
                     match Argument::parse(args, &command) {
                         Ok(arguments) => self.run(command, arguments),
                         Err(error) => Some(Self::error(&error)),
                     }
-                }
                 Err(error) => Some(Self::error(&error)),
             }
         }
@@ -65,15 +63,14 @@ mod console {
             match cmd {
                 Command::Stop => None,
                 Command::Config => Some(Self::message(&"Server Config", &self.server_config)),
-                Command::Help => {
+                Command::Help =>
                     Some(
                         if let Argument::Command(search, _) = args {
                             Self::message(&"Help", &search)
                         } else {
                             Self::message(&"Help", &"help <cmd?> \nconfig \nstop")
                         }
-                    )
-                }
+                    ),
             }
         }
 
@@ -128,15 +125,6 @@ mod command {
     }
 
     impl Command {
-        // const HELP: [(&'static str, &'static str); 4] = [
-        //     ("config", "Get the server's current configuration"),
-        //     (
-        //         "help <cmd?>",
-        //         "Lists all commands, or gets information about a specific command",
-        //     ),
-        //     ("stop", "Stop the server"),
-        //     ("Commands", "help <cmd?> \nconfig \nstop"),
-        // ];
         pub fn parse(cmd: Option<String>) -> Result<Self, CommandError> {
             if let Some(cmd) = cmd {
                 match &cmd[..] {
@@ -156,21 +144,6 @@ mod command {
                 Self::Stop => format!("stop"),
             }
         }
-        // pub fn msg(&self, console: &Console) -> String {
-        //     match self {
-        //         Self::Help(args) => {
-        //             let (name, msg) = match args {
-        //                 HelpArguments::Config => Command::HELP[0],
-        //                 HelpArguments::Help => Command::HELP[1],
-        //                 HelpArguments::Stop => Command::HELP[2],
-        //                 HelpArguments::All => Command::HELP[3],
-        //             };
-        //             Console::message(&name, &msg)
-        //         }
-        //         Self::Config => Console::message(&"Server Config", &console.server_config),
-        //         _ => String::new(),
-        //     }
-        // }
     }
 
     impl Display for Command {
@@ -200,112 +173,18 @@ mod command {
         }
     }
 
-    // #[cfg(test)]
-    // mod tests {
-    //     use super::*;
-
-    //     #[test]
-    //     fn blank_cmd() {
-    //         let err = ConsoleError::from(CommandError(
-    //             String::from("No Command"),
-    //             String::from("No command validly submitted"),
-    //             String::new(),
-    //         ));
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("").parse();
-    //         match_helper(&cmd, &err);
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("       ").parse();
-    //         match_helper(&cmd, &err);
-
-    //         let cmd: Result<Command, ConsoleError> = String::new().parse();
-    //         match_helper(&cmd, &err);
-    //     }
-
-    //     #[test]
-    //     fn valid_cmd() {
-    //         let cmd: Command = String::from("stop").parse().unwrap();
-    //         assert_eq!(cmd, Command::Stop);
-
-    //         let cmd: Command = String::from("config").parse().unwrap();
-    //         assert_eq!(cmd, Command::Config);
-
-    //         let cmd: Command = String::from("help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::All));
-
-    //         let cmd: Command = String::from("help stop").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Stop));
-
-    //         let cmd: Command = String::from("help config").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Config));
-
-    //         let cmd: Command = String::from("help help").parse().unwrap();
-    //         assert_eq!(cmd, Command::Help(HelpArguments::Help));
-    //     }
-
-    //     #[test]
-    //     fn invalid_cmd() {
-    //         let err = ConsoleError::from(CommandError(
-    //             String::from("Unknown Command"),
-    //             format!("{} does not exist", "foo"),
-    //             String::from("foo"),
-    //         ));
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("foo bar").parse();
-    //         match_helper(&cmd, &err);
-    //     }
-
-    //     #[test]
-    //     fn invalid_help() {
-    //         let cmd: Result<Command, ConsoleError> = String::from("help foo").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(
-    //                 ArgumentError(
-    //                     String::from("Invalid"),
-    //                     format!(
-    //                         "{} is not a valid name of a command. Try running 'help' without arguments to see all commands",
-    //                         "foo"
-    //                     ),
-    //                     format!("help {}", "foo")
-    //                 )
-    //             )
-    //         );
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("help foo bar").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(ArgumentError(
-    //                 String::from("Too Many"),
-    //                 format!("{} arguments were found, only 1 was expected", 2),
-    //                 format!("help {0} {1}", "foo", "bar"),
-    //             )),
-    //         );
-
-    //         let cmd: Result<Command, ConsoleError> = String::from("help config foo bar baz").parse();
-    //         match_helper(
-    //             &cmd,
-    //             &ConsoleError::from(ArgumentError(
-    //                 String::from("Too Many"),
-    //                 format!("{} arguments were found, only 1 was expected", 4),
-    //                 format!("help {0} {1}", "config", "foo"),
-    //             )),
-    //         );
-    //     }
-
-    //     fn match_helper(x: &Result<Command, ConsoleError>, eq: &ConsoleError) {
-    //         match x {
-    //             Ok(_) => panic!("Should be a ConsoleError"),
-    //             Err(e) => assert_eq!(eq, e),
-    //         }
-    //     }
-    // }
+    #[cfg(test)]
+    mod tests {
+        #[allow(unused_imports)]
+        use super::*;
+    }
 }
 
 mod arguments {
-    use self::ArgOption::{ None, Optional, RequiredChain, Required };
+    use self::ArgOption::{ None, Optional, Required, RequiredChain };
     use super::*;
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone)]
     enum ArgOption {
         None,
@@ -330,6 +209,7 @@ mod arguments {
         def: Def,
     }
 
+    #[allow(dead_code)]
     #[derive(Debug, Clone)]
     enum Def {
         Command,
@@ -340,6 +220,7 @@ mod arguments {
         fn new(def: Def, opt: ArgOption) -> Self {
             Self { opt, def }
         }
+        #[allow(dead_code)]
         fn new_boxed(def: Def, opt: ArgOption) -> Box<Self> {
             Box::new(Self::new(def, opt))
         }
@@ -651,12 +532,16 @@ mod arguments {
         #[test]
         fn invalid_args() {
             let result = should_err(Argument::parse(vec![format!("foo")], &Command::Help));
-            assert_eq!(result, ArgumentError::Invalid { location: "help foo".to_string() });
+            assert_eq!(result, ArgumentError::Invalid {
+                location: "help foo".to_string(),
+            });
 
             let result = should_err(
                 Argument::parse(vec![format!("foo"), format!("bar")], &Command::Help)
             );
-            assert_eq!(result, ArgumentError::Invalid { location: "help foo".to_string() });
+            assert_eq!(result, ArgumentError::Invalid {
+                location: "help foo".to_string(),
+            });
 
             let result = should_err(test_example_def(vec!["1.1"]));
             assert_eq!(result, ArgumentError::Invalid {

@@ -1,5 +1,6 @@
+use chesstacean::server::{ self, ServerConfig, database };
 use std::env;
-use chesstacean::server::{ self, ServerConfig };
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
@@ -8,12 +9,20 @@ async fn main() {
 
     let config = ServerConfig::build(args).unwrap_or(ServerConfig::new([127, 0, 0, 1], 3000, None));
 
+    let (tx, _rx) = mpsc::channel(1);
+
+    let routes = server::ws_make(server::static_make(), tx);
+
+    database::start();
+
     match config.tls {
         Some(_) => {
-            tokio::task::spawn(server::run_tls_server(&config).unwrap());
+            let tls_svr = server::run_tls_server(&config, routes).unwrap();
+            tokio::task::spawn(tls_svr);
         }
         None => {
-            tokio::task::spawn(server::run_server(&config));
+            let svr = server::run_server(&config, routes);
+            tokio::task::spawn(svr);
         }
     }
 
