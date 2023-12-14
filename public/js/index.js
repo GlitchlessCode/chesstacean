@@ -36,18 +36,42 @@ const gridHeight = 8;
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
 
+	// draw squares
+
+	const gridboxWidth = cnv.width / gridWidth;
+	const gridboxHeight = cnv.height / gridHeight;
+
+	for (let i = 0; i < gridHeight; i++) {
+		for (let j = i % 2; j < gridWidth; j += 2) {
+			const x = gridboxWidth * j;
+			const y = gridboxHeight * i;
+
+			ctx.rect(x, y, gridboxWidth, gridboxHeight);
+			ctx.fillStyle = "#101010";
+			ctx.fill();
+		}
+	}
+
+	// draw lines
+
+	for (let i = 0; i < gridWidth - 1; i++) {
+		const x = gridboxWidth * (i + 1);
+
+		drawLine(x, 0, x, cnv.height);
+	}
+
+	for (let i = 0; i < gridHeight - 1; i++) {
+		const y= gridboxHeight * (i + 1);
+
+		drawLine(0, y, cnv.width, y);
+	}
+
 	// draw borders
 
 	drawLine(borderWidth / 2, 0, 0, cnv.height);
 	drawLine(0, borderWidth / 2, cnv.width , 0);
 	drawLine(cnv.width - borderWidth / 2, 0, cnv.width, cnv.height);
 	drawLine(0, cnv.height - borderWidth / 2, cnv.width, cnv.height);
-
-	for (let i = 0; i < gridWidth - 1; i++) {
-		const x = cnv.width / gridWidth * (i + 1);
-
-		drawLine(x, 0, x, cnv.height);
-	}
 
 	requestAnimationFrame(update);
 }
