@@ -16,7 +16,7 @@ pub fn static_make() -> impl Filter<Extract = (impl warp::Reply,), Error = Rejec
     images
         .or(css)
         .or(js)
-        .or(warp::any().and(warp::fs::file("./public/pages/index.html")))
+        .or(warp::any().and(warp::fs::dir("./public/pages")))
 }
 
 pub fn ws_make(
