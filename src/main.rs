@@ -13,7 +13,8 @@ async fn main() {
 
     let (tx, _rx) = mpsc::channel(1);
 
-    let routes = server::ws_make(server::page_make(server::static_make()), tx);
+    // let routes = server::ws_make(server::page_make(server::static_make()), tx);
+    let routes = server::ws_make(server::static_make(), tx);
 
     database::start();
 

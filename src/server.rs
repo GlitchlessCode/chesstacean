@@ -13,7 +13,10 @@ pub fn static_make() -> impl Filter<Extract = (impl warp::Reply,), Error = Rejec
     let images = warp::path("img").and(warp::fs::dir("./public/img"));
     let css = warp::path("css").and(warp::fs::dir("./public/css"));
     let js = warp::path("js").and(warp::fs::dir("./public/js"));
-    images.or(css).or(js)
+    images
+        .or(css)
+        .or(js)
+        .or(warp::any().and(warp::fs::file("./public/pages/index.html")))
 }
 
 pub fn ws_make(
