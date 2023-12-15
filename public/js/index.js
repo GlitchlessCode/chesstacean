@@ -87,8 +87,8 @@ function drawLine(x1, y1, x2, y2) {
 };
 
 cnv.addEventListener("resize", () => {
-	cnv.width  = Math.floor(cnv.getBoundingClientRect().width  * window.devicePixelRatio);
-	cnv.height = Math.floor(cnv.getBoundingClientRect().height * window.devicePixelRatio);
+	cnv.width  = Math.floor(cnv.getBoundingClientRect().width );
+	cnv.height = Math.floor(cnv.getBoundingClientRect().height);
 });
 
 cnv.dispatchEvent(new Event("resize"));
