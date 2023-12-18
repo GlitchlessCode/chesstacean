@@ -1,21 +1,15 @@
-use rusqlite::{config::DbConfig, Connection, Row};
+use anyhow::Result;
+use rusqlite::{config::DbConfig, params, Connection, Row};
 use std::fs;
 
-pub fn start() {
+pub fn init() -> Database {
     let path = "./db/";
 
     fs::create_dir_all(path.to_owned()).expect(&format!("Failed to open or create directory at {path}"));
     let database = Connection::open(path.to_owned() + "chesstacean.db3")
         .expect(&format!("Failed to open or create database at {path}chesstacean.db3"));
 
-    database
-        .set_db_config(DbConfig::SQLITE_DBCONFIG_ENABLE_FKEY, true)
-        .expect("Failed to configure database");
-
-    match create_tables(&database) {
-        Err(e) => eprintln!("\x1b[1;31m{e}\x1b[0m\n"),
-        Ok(_) => (),
-    }
+    Database::new(database)
 
     // let mut stmnt = database
     //     .prepare("INSERT INTO games(black, white, moves) VALUES (?1, ?2, ?3)")
@@ -42,6 +36,56 @@ pub fn start() {
     //     .unwrap();
 }
 
+pub struct Database {
+    conn: Connection,
+}
+
+impl Database {
+    fn new(database: Connection) -> Self {
+        database
+            .set_db_config(DbConfig::SQLITE_DBCONFIG_ENABLE_FKEY, true)
+            .expect("Failed to configure database");
+
+        match create_tables(&database) {
+            Err(e) => eprintln!("\x1b[1;31m{e}\x1b[0m\n"),
+            Ok(_) => (),
+        }
+        Self { conn: database }
+    }
+
+    pub fn sessions<'a>(&'a self) -> Sessions<'a> {
+        Sessions { conn: &self.conn }
+    }
+}
+
+pub struct Sessions<'a> {
+    conn: &'a Connection,
+}
+
+impl<'a> Sessions<'a> {
+    pub fn validate_session(&self, cookie: &str) -> bool {
+        let mut stmnt = self
+            .conn
+            .prepare_cached("SELECT invalid FROM sessions WHERE cookie = ?1")
+            .expect("Should be a valid sql statement");
+        let result: Vec<Result<bool, rusqlite::Error>> =
+            match stmnt.query_map(params![cookie], |row| row.get::<usize, bool>(0)) {
+                Ok(mapped) => mapped.collect(),
+                Err(_) => return false,
+            };
+
+        if result.len() != 1 {
+            return false;
+        } else {
+            let value = match result.into_iter().next() {
+                Some(res) => res.expect("Should never be err"),
+                None => return false,
+            };
+            !value
+        }
+    }
+}
+
 fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
     attempt_create(database)?;
     for table in get_tables().iter() {
@@ -52,6 +96,9 @@ fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+/// Attempts to create tables in sqlite database
+///
+/// Keep in mind, table definitions are hardcoded values
 fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
     database.execute(
         "CREATE TABLE IF NOT EXISTS users (
@@ -87,9 +134,23 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
+    database.execute(
+        "CREATE TABLE IF NOT EXISTS tokens (
+            id INTEGER PRIMARY KEY,
+            token TEXT NOT NULL UNIQUE,
+            user INTEGER NOT NULL,
+            expiry DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
+       );",
+        [],
+    )?;
+
     Ok(())
 }
 
+/// Creates `TableInfo` definitions
+///
+/// Keep in mind, table definitions are hardcoded values
 fn get_tables() -> Vec<TableInfo> {
     let mut tables = Vec::new();
 
@@ -125,6 +186,20 @@ fn get_tables() -> Vec<TableInfo> {
                 .kind("INTEGER")
                 .not_null(true)
                 .default_value(Some("0".to_owned())),
+        ],
+    });
+
+    tables.push(TableInfo {
+        name: "tokens".to_owned(),
+        columns: vec![
+            ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("token").not_null(true),
+            ColumnInfo::default().name("user").kind("INTEGER").not_null(true),
+            ColumnInfo::default()
+                .name("expiry")
+                .kind("DATETIME")
+                .not_null(true)
+                .default_value(Some("CURRENT_TIMESTAMP".to_owned())),
         ],
     });
 

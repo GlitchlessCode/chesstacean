@@ -1,16 +1,17 @@
-// enum TeamColor {
-//     White,
-//     Black
-// }
+enum TeamColor {
+    White,
+    Black,
+}
 
-// enum PieceType {
-//     King,
-//     Queen,
-//     Pawn,
-//     Bishop,
-//     Knight,
-//     Rook,
-// }
+enum PieceType {
+    King,
+    Queen,
+    Pawn,
+    Bishop,
+    Knight,
+    Rook,
+}
+
 // pub struct Piece {
 //     // x: i16,
 //     // y: i16,

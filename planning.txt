@@ -18,7 +18,7 @@ Routes:
 /match/:id
 
 /ws/token
-/ws/echo
+/ws/connect
 
 ------------------------
 
