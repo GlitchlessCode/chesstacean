@@ -1,15 +1,13 @@
-// struct Board<'a> {
-//     tiles: [tiles::Tile<'a>; 64],
+// struct Board {
+//     height: u8,
+//     width: u8
 // }
 
-// impl Board<'_> {
-//     fn reset_board(self) {
-//         for mut tile in self.tiles {
-//             tile.state = tiles::TileState::Empty
+// impl Board {
+//     pub fn new() -> Self {
+//         Board {
+//             height: 8,
+//             width: 8
 //         }
-
-//         // add default configuration here later
 //     }
 // }
-
-// pub mod tiles;
