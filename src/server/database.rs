@@ -130,7 +130,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             cookie TEXT NOT NULL UNIQUE,
             user INTEGER,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 3600000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
        );",
@@ -142,7 +142,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             token TEXT NOT NULL UNIQUE,
             session INTEGER NOT NULL,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 3600000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_session FOREIGN KEY (session) REFERENCES sessions(id)
        );",
@@ -189,7 +189,9 @@ fn get_tables() -> Vec<TableInfo> {
                 .name("expiry")
                 .kind("INTEGER")
                 .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
+                .default_value(Some(
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 3600000".to_owned(),
+                )),
             ColumnInfo::default()
                 .name("invalid")
                 .kind("INTEGER")
@@ -208,7 +210,9 @@ fn get_tables() -> Vec<TableInfo> {
                 .name("expiry")
                 .kind("INTEGER")
                 .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
+                .default_value(Some(
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 3600000".to_owned(),
+                )),
             ColumnInfo::default()
                 .name("invalid")
                 .kind("INTEGER")

@@ -1,3 +1,5 @@
+use std::net::{IpAddr, SocketAddr};
+
 use http::{Response, StatusCode};
 use warp::{filters::fs::File, reply::Reply};
 
@@ -58,6 +60,7 @@ pub fn page_make(
         .and(warp::get())
         .and(warp::cookie::optional("auth"))
         .and(warp::fs::file("./public/pages/index.html"))
+        .and(warp::filters::addr::remote())
         .map(has_auth_cookie);
 
     let login_route = warp::path("login").and(warp::fs::file("./public/pages/login/index.html"));
@@ -79,7 +82,11 @@ pub fn attach_404(
     routes.or(none_found_route)
 }
 
-fn has_auth_cookie(cookie: Option<String>, file: File) -> impl Reply {
+fn has_auth_cookie(cookie: Option<String>, file: File, ip: Option<SocketAddr>) -> impl Reply {
+    eprintln!(
+        "{}",
+        ip.unwrap_or(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
+    );
     match cookie {
         None => warp::reply::with_header(file, "set-cookie", "auth=xyz; HttpOnly; SameSite=Strict"),
         Some(_cookie) => warp::reply::with_header(file, "set-cookie", "auth=xyz; HttpOnly; SameSite=Strict"),
