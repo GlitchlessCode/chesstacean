@@ -1,60 +1,16 @@
+use self::ws::Connection;
 use futures_util::Future;
 use std::fmt::Display;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::str::FromStr;
 use tokio::sync::{mpsc, oneshot};
 use warp::{filters::ws::WebSocket, http, reject::Rejection, Filter};
 
-use std::net::{Ipv4Addr, SocketAddrV4};
-
 pub mod console;
 pub mod database;
-
-pub fn static_make() -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
-    let images = warp::path("img").and(warp::fs::dir("./public/img"));
-    let css = warp::path("css").and(warp::fs::dir("./public/css"));
-    let js = warp::path("js").and(warp::fs::dir("./public/js"));
-    images
-        .or(css)
-        .or(js)
-        .or(warp::any().and(warp::fs::dir("./public/pages")))
-}
-
-pub fn ws_make(
-    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
-    ws_target: mpsc::Sender<(warp::filters::ws::WebSocket, oneshot::Sender<()>)>,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
-    let ws_route = warp::path!("ws" / "echo")
-        .and(warp::ws())
-        .map(move |ws: warp::filters::ws::Ws| {
-            let new_target = ws_target.clone();
-            ws.on_upgrade(move |websocket| user_connected(websocket, new_target))
-        });
-    ws_route.or(routes)
-}
-
-pub fn page_make(
-    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
-    let home_route = warp::path::end().map(|| {
-        http::Response::builder()
-            .header("content-type", "text/html; charset=utf-8")
-            .header("set-cookie", "abc=xyz")
-            .body("<!DOCTYPE html><html><head></head><body><h1>Hello, World!</h1></body></html>")
-    });
-    home_route.or(routes)
-}
-
-async fn user_connected(
-    websocket: WebSocket,
-    ws_target: mpsc::Sender<(warp::filters::ws::WebSocket, oneshot::Sender<()>)>,
-) {
-    let (tx, rx) = oneshot::channel::<()>();
-    ws_target
-        .send((websocket, tx))
-        .await
-        .expect("This channel should never be closed");
-    rx.await.ok();
-}
+pub mod routes;
+pub mod user;
+pub mod ws;
 
 pub fn run_server(
     config: &ServerConfig,
