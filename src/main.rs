@@ -13,7 +13,7 @@ async fn main() {
     let user_registry = Registry::new();
     tokio::task::spawn(user_registry.start(rx));
 
-    let routes = routes::ws_make(routes::page_make(routes::static_make()), tx);
+    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), tx));
     // let routes = routes::ws_make(routes::static_make(), tx);
 
     let mut args = env::args();

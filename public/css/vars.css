@@ -1,0 +1,9 @@
+:root {
+  --font-family: "Inter", sans-serif;
+
+  --color-accent: #ff582f;
+  --color-foreground: #dddddd;
+  --color-midforeground: #666666;
+  --color-midbackground: #101010;
+  --color-background: #000000;
+}

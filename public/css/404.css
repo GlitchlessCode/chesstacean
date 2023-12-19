@@ -1,0 +1,91 @@
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  font-family: var(--font-family);
+}
+
+#main {
+  position: absolute;
+  padding: 64px;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+#main > div {
+  height: 100%;
+  background: linear-gradient(
+    to bottom right,
+    #101010 0%,
+    #101010 50%,
+    #0c0c0c 50%,
+    #0c0c0c 100%
+  );
+  border-radius: 20px;
+  display: flex;
+}
+
+@media (min-width: 1050px) {
+  #main > div > div.right {
+    flex-grow: 1;
+    translate: -32px 0;
+
+    background-size: min(75%, 420px);
+    background-image: url("/img/mascot.svg");
+    background-repeat: no-repeat;
+    background-position: 50% bottom;
+  }
+}
+
+#main > div > div.left {
+  margin-left: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+}
+
+#main > div > div.left > div.error {
+  padding: 20px 0;
+  width: 100%;
+  font-family: "Courier New", Courier, monospace;
+  color: red;
+  background: var(--color-background);
+
+  border-radius: 5px;
+
+  display: flex;
+  justify-content: center;
+}
+
+div.error h3 {
+  width: 0;
+  flex-grow: 1;
+  color: red;
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+h1 {
+  margin: 0;
+  font-size: 40px;
+
+  font-weight: 900;
+
+  color: var(--color-foreground);
+}
+
+h2 {
+  margin: 0;
+  font-size: 24px;
+
+  font-weight: 900;
+
+  color: var(--color-foreground);
+}
+
+h3 {
+  margin: 0;
+}

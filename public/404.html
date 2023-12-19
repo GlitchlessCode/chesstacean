@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>chesstacean: 404</title>
+
+    <link rel="icon" href="/img/favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" href="/css/vars.css" />
+    <link rel="stylesheet" href="/css/404.css" />
+  </head>
+  <body>
+    <div id="main">
+      <div>
+        <div class="left">
+          <div>
+            <h1>this page could not be found</h1>
+            <h2>oops...</h2>
+          </div>
+          <div class="error">
+            <h3>
+              404: Page Not Found <br />
+              <span id="context"></span>
+            </h3>
+          </div>
+        </div>
+        <div class="right"></div>
+      </div>
+    </div>
+
+    <script>
+      document.querySelector("span#context").innerText = `at ${location.href}`;
+    </script>
+  </body>
+</html>
