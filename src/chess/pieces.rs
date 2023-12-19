@@ -3,31 +3,56 @@ enum TeamColor {
     Black,
 }
 
-enum PieceType {
-    King,
-    Queen,
-    Pawn,
-    Bishop,
-    Knight,
-    Rook,
-}
+// enum PieceType {
+//     King,
+//     Queen,
+//     Pawn,
+//     Bishop,
+//     Knight,
+//     Rook,
+// }
+
+// impl PieceType {
+//     pub fn get_moves(self) -> Vec<Move> {
+//         match self {
+//                     King => ,
+//                     Queen => ,
+//                     Pawn => ,
+//                     Bishop => ,
+//                     Knight => ,
+//                     Rook => ,
+//         }
+//     }
+// }
+
+// enum Move {
+//     End,
+//     Pos {
+//         next: Box<Progress<Move>>,
+//         pos: Position
+//     }
+// }
+
+// enum Progress<T> {
+//     Valid(T),
+//     Invalid(T)
+// }
+
+// struct Position {
+//     x: u8,
+//     y: u8
+// }
 
 // pub struct Piece {
-//     // x: i16,
-//     // y: i16,
 //     piece_type: PieceType,
 //     color: TeamColor,
-//     killed: bool,
 // }
 
 // impl Piece {
 //     pub fn new(piece: PieceType, color: TeamColor, ) -> Self {
 //         Piece {
-//             // x: i16,
-//             // y: i16,
 //             piece_type: piece,
 //             color: color,
-//             killed: false,
 //         }
 //     }
 
@@ -43,18 +68,6 @@ enum PieceType {
 //     }
 
 //     pub fn can_move(self, id: i16) -> bool {
-//         // if self.check(id) == true
-//             match self.piece_type {
-//                 King => ,
-//                 Queen => ,
-//                 Pawn => ,
-//                 Bishop => ,
-//                 Knight => ,
-//                 Rook => ,
-//             }
-//     }
-
-//     fn check_tile(tile_array: [tiles::Tile<'a>; 64]) -> bool {
-//         // check if tile is occupied by own piece
+//         // check if tile is one of the possible moves in PieceType.get_moves
 //     }
 // }

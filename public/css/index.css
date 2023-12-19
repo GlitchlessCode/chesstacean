@@ -406,9 +406,6 @@ main > div.right > div.stats {
 #game-window > div.mid > canvas {
   width: 100%;
   aspect-ratio: 1/1;
-
-  /* TEMP */
-  background-color: var(--color-midbackground);
 }
 
 #game-window > div.left {
