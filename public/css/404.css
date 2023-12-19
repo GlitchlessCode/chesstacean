@@ -48,7 +48,8 @@ body {
 }
 
 #main > div > div.left > div.error {
-  padding: 20px 0;
+  box-sizing: border-box;
+  padding: 20px 20px;
   width: 100%;
   font-family: "Courier New", Courier, monospace;
   color: red;
