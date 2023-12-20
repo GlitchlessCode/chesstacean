@@ -1,12 +1,12 @@
 use chesstacean::server::{
     self,
-    database::{self, Database, DatabaseMessage, DatabaseResult, Sessions},
+    database::{self, Database, DatabaseMessage, DatabaseResult},
     routes,
     user::registry::Registry,
     ServerConfig,
 };
-use std::env;
-use tokio::sync::{mpsc, oneshot};
+use std::{env, net::SocketAddr};
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
@@ -15,18 +15,12 @@ async fn main() {
     let (database, db_tx) = database::init();
 
     tokio::task::spawn(database);
+    // "127.0.0.1:50240"
+    let ip = SocketAddr::from(([127, 0, 0, 1], 50240));
 
-    let cookie = "1234";
-    let thing = move |db: &Database| DatabaseResult::from(Sessions::validate_session(&db.sessions(), cookie));
+    let thing = move |db: &Database| DatabaseResult::from(db.sessions().create_new_session(ip));
 
-    let cookie2 = "12345";
-    let thing2 = move |db: &Database| DatabaseResult::from(Sessions::validate_session(&db.sessions(), cookie2));
-
-    let result = DatabaseMessage::send_blocking(thing, &db_tx).await.unwrap();
-
-    eprintln!("{result}");
-
-    let result = DatabaseMessage::send_blocking(thing2, &db_tx).await.unwrap();
+    let result = DatabaseMessage::send(thing, &db_tx).await.unwrap();
 
     eprintln!("{result}");
 

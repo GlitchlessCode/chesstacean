@@ -2,7 +2,10 @@ extern crate sha2;
 
 use super::user::User;
 use anyhow::Result;
+use base64::{engine::general_purpose, Engine};
 use futures_util::Future;
+use hmac::digest::generic_array::sequence::Lengthen;
+use rand::{thread_rng, Rng};
 use rusqlite::{config::DbConfig, params, Connection, Row};
 use sha2::{Digest, Sha256};
 use std::{
@@ -85,7 +88,16 @@ pub struct Sessions<'a> {
 }
 
 impl<'a> Sessions<'a> {
+    fn check_expiry(&self, cookie: &str) {
+        let stmnt = self
+            .conn
+            .prepare_cached("SELECT expiry FROM sessions WHERE cookie = ?1")
+            .expect("Should be a valid sql statement");
+
+        let time = get_timestamp();
+    }
     pub fn validate_session(&self, cookie: &str) -> bool {
+        self.check_expiry(cookie);
         let mut stmnt = self
             .conn
             .prepare_cached("SELECT invalid FROM sessions WHERE cookie = ?1")
@@ -106,38 +118,79 @@ impl<'a> Sessions<'a> {
             !value
         }
     }
-    pub fn create_new_session(&self, ip: SocketAddr) -> String {
+    pub fn create_new_session(&self, ip: SocketAddr) -> Result<String> {
         // Convert user IP to string
         let ip_str = ip.to_string();
 
         // Get the current timestamp
-        let start = SystemTime::now();
-        let since_epoch = start
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards, should not be possible");
-        let time = since_epoch.as_millis();
+        let time = get_timestamp();
 
         // sha256(IP + Timestamp)
         let combine = format!("{ip_str}{time}");
-        eprintln!("{combine}");
 
-        String::from("a")
-        // let mut hasher = <Sha256 as Digest>::new();
-        // Digest::update(&mut hasher, b"hello world");
-        // let result = Digest::finalize(hasher);
-        // eprintln!("Digest: {result:?}\nTime: {time}");
+        let mut hasher = <Sha256 as Digest>::new();
+        Digest::update(&mut hasher, combine.as_bytes());
+        let digest = Digest::finalize(hasher);
+
+        // random 32 bytes of data
+        let mut rand = [0u8; 32];
+        thread_rng().fill(&mut rand);
+
+        // Digest + Random
+        let mut result = digest.to_vec();
+        result.append(&mut rand.to_vec());
+
+        // Encode as Base64
+        let encoded = general_purpose::STANDARD.encode(result);
+
+        // Enable Session in SQLite DB
+        let mut stmnt = self
+            .conn
+            .prepare_cached("INSERT INTO sessions (cookie) VALUES (?1)")
+            .expect("Should be a valid sql statement");
+
+        stmnt.execute(params![encoded])?;
+
+        Ok(encoded)
     }
     pub fn assign_session_user() {}
+}
+
+fn get_timestamp() -> u128 {
+    let start = SystemTime::now();
+    let since_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards, should not be possible");
+    since_epoch.as_millis()
 }
 
 pub enum DatabaseResult {
     Bool(bool),
     String(String),
+    ResultString(Result<String>),
 }
 
 impl From<bool> for DatabaseResult {
     fn from(value: bool) -> Self {
         Self::Bool(value)
+    }
+}
+
+impl From<String> for DatabaseResult {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for DatabaseResult {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Result<String>> for DatabaseResult {
+    fn from(value: Result<String>) -> Self {
+        Self::ResultString(value)
     }
 }
 
@@ -149,6 +202,7 @@ impl Display for DatabaseResult {
             match self {
                 Self::Bool(b) => b.to_string(),
                 Self::String(s) => s.to_string(),
+                Self::ResultString(r) => format!("{:?}", r),
             }
         )
     }
@@ -178,7 +232,7 @@ impl DatabaseMessage {
         }
     }
 
-    pub async fn send_blocking(
+    pub async fn send(
         func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
         db_tx: &Sender<DatabaseMessage>,
     ) -> Result<DatabaseResult> {
