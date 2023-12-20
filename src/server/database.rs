@@ -1,16 +1,30 @@
+extern crate sha2;
+
 use super::user::User;
 use anyhow::Result;
+use futures_util::Future;
 use rusqlite::{config::DbConfig, params, Connection, Row};
-use std::fs;
+use sha2::{Digest, Sha256};
+use std::{
+    fmt::Display,
+    fs,
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
-pub fn init() -> Database {
+pub fn init() -> (impl Future<Output = ()>, Sender<DatabaseMessage>) {
     let path = "./db/";
 
     fs::create_dir_all(path.to_owned()).expect(&format!("Failed to open or create directory at {path}"));
-    let database = Connection::open(path.to_owned() + "chesstacean.db3")
+    let conn = Connection::open(path.to_owned() + "chesstacean.db3")
         .expect(&format!("Failed to open or create database at {path}chesstacean.db3"));
 
-    Database::new(database)
+    let database = Database::new(conn);
+
+    let (tx, rx) = mpsc::channel(1);
+
+    (database.start(rx), tx)
 
     // let mut stmnt = database
     //     .prepare("INSERT INTO games(black, white, moves) VALUES (?1, ?2, ?3)")
@@ -54,6 +68,13 @@ impl Database {
         Self { conn: database }
     }
 
+    async fn start(self, mut db_rx: Receiver<DatabaseMessage>) -> () {
+        while let Some(db_msg) = db_rx.recv().await {
+            db_msg.run(&self);
+        }
+        panic!("db_rx mspc channel was closed: this channel should never close");
+    }
+
     pub fn sessions<'a>(&'a self) -> Sessions<'a> {
         Sessions { conn: &self.conn }
     }
@@ -85,7 +106,93 @@ impl<'a> Sessions<'a> {
             !value
         }
     }
-    pub fn create_new_session(user: Option<User>) {}
+    pub fn create_new_session(&self, ip: SocketAddr) -> String {
+        // Convert user IP to string
+        let ip_str = ip.to_string();
+
+        // Get the current timestamp
+        let start = SystemTime::now();
+        let since_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards, should not be possible");
+        let time = since_epoch.as_millis();
+
+        // sha256(IP + Timestamp)
+        let combine = format!("{ip_str}{time}");
+        eprintln!("{combine}");
+
+        String::from("a")
+        // let mut hasher = <Sha256 as Digest>::new();
+        // Digest::update(&mut hasher, b"hello world");
+        // let result = Digest::finalize(hasher);
+        // eprintln!("Digest: {result:?}\nTime: {time}");
+    }
+    pub fn assign_session_user() {}
+}
+
+pub enum DatabaseResult {
+    Bool(bool),
+    String(String),
+}
+
+impl From<bool> for DatabaseResult {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl Display for DatabaseResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Bool(b) => b.to_string(),
+                Self::String(s) => s.to_string(),
+            }
+        )
+    }
+}
+
+pub struct DatabaseMessage {
+    result: tokio::sync::oneshot::Sender<DatabaseResult>,
+    func: Box<dyn Fn(&Database) -> DatabaseResult + Send>,
+}
+
+impl DatabaseMessage {
+    pub fn new(
+        func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
+        tx: tokio::sync::oneshot::Sender<DatabaseResult>,
+    ) -> Self {
+        Self {
+            result: tx,
+            func: Box::new(func),
+        }
+    }
+
+    fn run(self, database: &Database) {
+        let result = (self.func)(database);
+        match self.result.send(result) {
+            Ok(_) => (),
+            Err(_) => eprint!("\x1b[1;31mFailed to return Database result to source\x1b[0m\n > "),
+        }
+    }
+
+    pub async fn send_blocking(
+        func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
+        db_tx: &Sender<DatabaseMessage>,
+    ) -> Result<DatabaseResult> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        db_tx
+            .send(Self {
+                result: tx,
+                func: Box::new(func),
+            })
+            .await
+            .expect("db_tx mspc channel closed: this channel should never close");
+
+        Ok(rx.await?)
+    }
 }
 
 fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {

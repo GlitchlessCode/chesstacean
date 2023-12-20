@@ -1,20 +1,42 @@
-use chesstacean::server::{self, database, routes, user::registry::Registry, ServerConfig};
+use chesstacean::server::{
+    self,
+    database::{self, Database, DatabaseMessage, DatabaseResult, Sessions},
+    routes,
+    user::registry::Registry,
+    ServerConfig,
+};
 use std::env;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 #[tokio::main]
 async fn main() {
     eprint!("\x1b[2J");
 
-    let db = database::init();
+    let (database, db_tx) = database::init();
 
-    let (tx, rx) = mpsc::channel(1);
+    tokio::task::spawn(database);
+
+    let cookie = "1234";
+    let thing = move |db: &Database| DatabaseResult::from(Sessions::validate_session(&db.sessions(), cookie));
+
+    let cookie2 = "12345";
+    let thing2 = move |db: &Database| DatabaseResult::from(Sessions::validate_session(&db.sessions(), cookie2));
+
+    let result = DatabaseMessage::send_blocking(thing, &db_tx).await.unwrap();
+
+    eprintln!("{result}");
+
+    let result = DatabaseMessage::send_blocking(thing2, &db_tx).await.unwrap();
+
+    eprintln!("{result}");
+
+    // Create routes and mpsc for WebSockets
+    let (ws_tx, ws_rx) = mpsc::channel(1);
 
     let user_registry = Registry::new();
-    tokio::task::spawn(user_registry.start(rx));
+    tokio::task::spawn(user_registry.start(ws_rx));
 
-    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), tx));
-    // let routes = routes::ws_make(routes::static_make(), tx);
+    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), ws_tx));
 
     let mut args = env::args();
     args.next();

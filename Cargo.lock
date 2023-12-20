@@ -157,10 +157,13 @@ dependencies = [
  "argon2",
  "dotenvy",
  "futures-util",
+ "hmac",
  "jwt",
+ "rand",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "warp",
 ]
