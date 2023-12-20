@@ -28,109 +28,149 @@ const cnv = document.getElementById("game-board");
 const ctx = cnv.getContext('2d');
 
 const gridWidth  = 8;
-const gridHeight = 8;
+const gridHeight = 4;
 
 const lineWidth = 2;
 
 requestAnimationFrame(update);
+
+class Coordinate {
+	x;
+	y;
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+	}
+}
 
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
 
 	// draw tiles
 
-	const gridboxWidth = cnv.width / gridWidth;
+	const gridboxWidth  = cnv.width  / gridWidth;
 	const gridboxHeight = cnv.height / gridHeight;
 
-	const gridboxSize = Math.min(gridboxWidth, gridboxHeight);
-
-	for (let i = 0; i < gridHeight; i++) {
-		for (let j = i % 2; j < gridWidth; j += 2) {
-			const x = gridboxSize * j;
-			const y = gridboxSize * i;
-
-			ctx.rect(x, y, gridboxSize, gridboxSize);
-			ctx.fillStyle = "#101010";
-			ctx.fill();
-		}
-	}
+	const gridboxSize   = Math.min(gridboxWidth, gridboxHeight);
 
 	const boardPosition = {
-		top: 0,
-		left: 0,
-		right: gridboxSize * gridWidth,
-		bottom: gridboxSize * gridHeight,
+		top:    (cnv.height - gridboxSize * gridHeight) / 2,
+		left:   (cnv.width  - gridboxSize * gridWidth ) / 2,
+		right:  cnv.width  - (cnv.width  - gridboxSize * gridWidth) / 2,
+		bottom: cnv.height - (cnv.height - gridboxSize * gridHeight) / 2,
 	};
 
-	// draw lines
+	// draw tiles
 
-	// vertical
+	ctx.fillStyle = "#101010";
 
-	for (let i = 0; i < gridWidth - 1; i++) {
-		const x = gridboxSize * (i + 1);
+	for (let col = 0; col < gridHeight; col++)
+		// col % 2 is used to checker the board by switching the starting position
+		for (let row = col % 2; row < gridWidth; row += 2) {
+			const x = boardPosition.left + gridboxSize * row;
+			const y = boardPosition.top  + gridboxSize * col;
 
-		drawLine(x, 0, x, gridboxSize * gridHeight);
+			ctx.rect(x, y, gridboxSize, gridboxSize);
+		}
+
+	ctx.fill();
+
+	// draw vertical lines
+
+	for (let i = 1; i < gridWidth; i++) {
+		const x = boardPosition.left + gridboxSize * i;
+
+		drawLine(
+			new Coordinate(x, boardPosition.top   ),
+			new Coordinate(x, boardPosition.bottom),
+		);
 	}
 
-	// horizontal
+	// draw horizontal lines
 
-	for (let i = 0; i < gridHeight - 1; i++) {
-		const y= gridboxSize * (i + 1);
+	for (let i = 1; i < gridHeight; i++) {
+		const y = boardPosition.top + gridboxSize * i;
 
-		drawLine(0, y, gridboxSize * gridWidth, y);
+		drawLine(
+			new Coordinate(boardPosition.left,  y),
+			new Coordinate(boardPosition.right, y),
+		);
 	}
 
 	// draw borders
 
-	drawLine(boardPosition.left, boardPosition.top, boardPosition.left, boardPosition.bottom);
-	drawLine(boardPosition.left, boardPosition.top, boardPosition.right, boardPosition.top);
-	drawLine(boardPosition.right, boardPosition.top, boardPosition.right, boardPosition.bottom);
-	drawLine(boardPosition.left, boardPosition.bottom, boardPosition.right, boardPosition.bottom);
+	drawLine(
+		new Coordinate(boardPosition.left,  boardPosition.top   ),
+		new Coordinate(boardPosition.left,  boardPosition.bottom),
+	);
+
+	drawLine(
+		new Coordinate(boardPosition.left,  boardPosition.top   ),
+		new Coordinate(boardPosition.right, boardPosition.top   ),
+	);
+
+	drawLine(
+		new Coordinate(boardPosition.right, boardPosition.top   ),
+		new Coordinate(boardPosition.right, boardPosition.bottom),
+	);
+
+	drawLine(
+		new Coordinate(boardPosition.left,  boardPosition.bottom),
+		new Coordinate(boardPosition.right, boardPosition.bottom),
+	);
 
 	// draw numbering and lettering
 
-	const labelMargin = 8;
+	// const labelMargin = 5/60 * gridboxSize;
 
-	ctx.font      = "12px Inter";
-	ctx.fillStyle = "#DDDDDD";
+	// ctx.font      = `${12/60 * gridboxSize}px Inter, sans-serif`;
+	// ctx.fillStyle = "#DDDDDD";
 
-	// vertical numbering
+	// // vertical numbering
 
-	ctx.textAlign = "left";
-	ctx.textBaseline = "top";
+	// ctx.textAlign = "left";
+	// ctx.textBaseline = "top";
 
-	const numberingX = boardPosition.left + labelMargin - lineWidth;
+	// const numberingX = boardPosition.left + labelMargin;
 
-	for (let i = 0; i < gridHeight; i++) {
-		const label      = gridHeight - i;
-		const numberingY = gridboxSize * i + labelMargin - lineWidth;
+	// for (let i = 0; i < gridHeight; i++) {
+	// 	const label      = gridHeight - i;
+	// 	const numberingY = gridboxSize * i + labelMargin;
 
-		ctx.fillText(label, numberingX, numberingY);
-	}
+	// 	ctx.fillText(label, numberingX, numberingY);
+	// }
 
-	// horizontal numbering
+	// // horizontal numbering
 
-	ctx.textAlign = "right";
-	ctx.textBaseline = "bottom";
+	// ctx.textAlign = "right";
+	// ctx.textBaseline = "bottom";
 
-	const letteringY = boardPosition.bottom - labelMargin + lineWidth;
+	// const letteringY = boardPosition.bottom - labelMargin;
 
-	for (let i = 0; i < gridWidth; i++) {
-		const label = i + 1;
-		const letteringX = gridboxSize * (i + 1) - labelMargin + lineWidth;
+	// for (let i = 0; i < gridWidth; i++) {
+	// 	const label = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
+	// 	const letteringX = gridboxSize * (i + 1) - labelMargin;
 
-		ctx.fillText(label, letteringX, letteringY);
-	}
+	// 	ctx.fillText(label, letteringX, letteringY);
+	// }
 
 	// TODO: ADD ZOOM TO CHESSBOARD
-	// TODO: ADD LETTERING HORIZONTAL SUPPORT FOR GRIDWIDTHS 26 AND UNDER
 	// TODO: MAKE NUMBERING/LETTERING + LABEL MARGIN SCALE WITH TILE SIZE
 }
 
-function drawLine(x1, y1, x2, y2) {
+/**
+ * @param {Coordinate} first
+ * @param {Coordinate} final
+ */
+function drawLine(first, final) {
 	ctx.beginPath();
-	ctx.moveTo(x1, y1);
-	ctx.lineTo(x2, y2);
+	ctx.moveTo(first.x, first.y);
+	ctx.lineTo(final.x, final.y);
 
 	ctx.strokeStyle = "#666666";
 	ctx.lineWidth   = lineWidth;
