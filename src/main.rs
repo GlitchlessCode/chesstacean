@@ -5,7 +5,7 @@ use chesstacean::server::{
     user::registry::Registry,
     ServerConfig,
 };
-use std::{env, net::SocketAddr};
+use std::env;
 use tokio::sync::mpsc;
 
 #[tokio::main]

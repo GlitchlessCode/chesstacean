@@ -2,9 +2,12 @@ extern crate sha2;
 
 use super::user::User;
 use anyhow::Result;
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use base64::{engine::general_purpose, Engine};
 use futures_util::Future;
-use hmac::digest::generic_array::sequence::Lengthen;
 use rand::{thread_rng, Rng};
 use rusqlite::{config::DbConfig, params, Connection, Row};
 use sha2::{Digest, Sha256};
@@ -28,30 +31,6 @@ pub fn init() -> (impl Future<Output = ()>, Sender<DatabaseMessage>) {
     let (tx, rx) = mpsc::channel(1);
 
     (database.start(rx), tx)
-
-    // let mut stmnt = database
-    //     .prepare("INSERT INTO games(black, white, moves) VALUES (?1, ?2, ?3)")
-    //     .unwrap();
-    // stmnt.execute(rusqlite::params![1, 2, "7,6>7,4;4,1>4,3;"]).unwrap(); // DOES NOT FAIL
-    // match stmnt.execute(rusqlite::params![1, 5, "7,6>7,4;"]) { // FAILS BECAUSE OF FK CONSTRAINT
-    //     Ok(_) => (),
-    //     Err(e) => eprintln!("E: {}", e),
-    // };
-
-    // This was succesfully sanitized
-    // let params = rusqlite::params![
-    //     "glitchlesscode",
-    //     "Timothy",
-    //     "1234",
-    //     "password1234); DROP TABLE users; --",
-    // ];
-
-    // database
-    //     .execute(
-    //         "INSERT INTO users(handle, display, salt, digest) VALUES (?1, ?2, ?3, ?4)",
-    //         params,
-    //     )
-    //     .unwrap();
 }
 
 pub struct Database {
@@ -80,6 +59,64 @@ impl Database {
 
     pub fn sessions<'a>(&'a self) -> Sessions<'a> {
         Sessions { conn: &self.conn }
+    }
+
+    pub fn auth<'a>(&'a self) -> Auth<'a> {
+        Auth {
+            conn: &self.conn,
+            argon2: Argon2::default(),
+        }
+    }
+}
+
+pub struct Auth<'a> {
+    conn: &'a Connection,
+    argon2: Argon2<'a>,
+}
+
+impl<'a> Auth<'a> {
+    fn hash_password(&self, info: &UserInfo, password: String) {}
+    fn user_exists(&self, handle: String) -> Option<UserInfo> {
+        let mut stmnt = self
+            .conn
+            .prepare_cached("SELECT handle, salt, digest FROM users WHERE handle = ?1")
+            .expect("Should be a valid sql statement");
+
+        match stmnt.query_row(params![handle], |row| Ok(UserInfo::from(row))) {
+            Err(_) => None,
+            Ok(r) => {
+                eprintln!("{r:?}");
+                Some(r)
+            }
+        }
+    }
+    pub fn create_user(&self) {}
+    pub fn validate_user(&self, handle: String, password: String) -> bool {
+        match self.user_exists(handle) {
+            None => false,
+            Some(info) => {
+                self.hash_password(&info, password);
+                true
+            }
+        }
+    }
+    pub fn update_user(&self) {}
+}
+
+#[derive(Debug)]
+pub struct UserInfo {
+    handle: String,
+    salt: String,
+    digest: String,
+}
+
+impl<'stmnt> From<&Row<'stmnt>> for UserInfo {
+    fn from(row: &Row<'stmnt>) -> Self {
+        Self {
+            handle: row.get_unwrap("handle"),
+            salt: row.get_unwrap("salt"),
+            digest: row.get_unwrap("digest"),
+        }
     }
 }
 
@@ -194,6 +231,7 @@ pub enum DatabaseResult {
     Bool(bool),
     String(String),
     ResultString(Result<String>),
+    TempOption(bool),
 }
 
 impl From<bool> for DatabaseResult {
@@ -220,6 +258,12 @@ impl From<Result<String>> for DatabaseResult {
     }
 }
 
+impl From<Option<UserInfo>> for DatabaseResult {
+    fn from(value: Option<UserInfo>) -> Self {
+        Self::TempOption(value.is_some())
+    }
+}
+
 impl Display for DatabaseResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -229,6 +273,7 @@ impl Display for DatabaseResult {
                 Self::Bool(b) => b.to_string(),
                 Self::String(s) => s.to_string(),
                 Self::ResultString(r) => format!("{:?}", r),
+                Self::TempOption(b) => b.to_string(),
             }
         )
     }

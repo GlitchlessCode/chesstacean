@@ -61,17 +61,26 @@ pub fn page_make(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
     db_tx: mpsc::Sender<DatabaseMessage>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
+    let home_tx = db_tx.clone();
     let home_route = warp::path::end()
         .and(warp::get())
         .and(warp::cookie::optional("auth"))
         .and(warp::fs::file("./public/pages/index.html"))
         .and(warp::filters::addr::remote())
         .and_then(move |cookie, file, ip| {
-            let tx = db_tx.clone();
+            let tx = home_tx.clone();
             async move { auth_cookie(cookie, file, ip, tx).await }
         });
 
-    let login_route = warp::path("login").and(warp::fs::file("./public/pages/login/index.html"));
+    let login_route = warp::path("login")
+        .and(warp::get())
+        .and(warp::cookie::optional("auth"))
+        .and(warp::fs::file("./public/pages/login/index.html"))
+        .and(warp::filters::addr::remote())
+        .and_then(move |cookie, file, ip| {
+            let tx = db_tx.clone();
+            async move { auth_cookie(cookie, file, ip, tx).await }
+        });
 
     home_route.or(login_route).or(routes)
 }
