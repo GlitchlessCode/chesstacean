@@ -329,7 +329,7 @@ main > div.right > div.stats {
   background-color: var(--color-midbackground);
 }
 
-#game-window {
+#game-popup {
   --game-margin: 32px;
   --canvas-size: calc(100vh - 2 / 10 * 100vw);
 
@@ -351,13 +351,13 @@ main > div.right > div.stats {
   background-color: var(--color-background);
 }
 
-#game-window.active {
+#game-popup.active {
   scale: 1;
   opacity: 1;
   z-index: 1;
 }
 
-#game-window > nav {
+#game-popup > nav {
   grid-row: 1;
   grid-column: 1 / 4;
 
@@ -367,7 +367,7 @@ main > div.right > div.stats {
   justify-content: space-between;
 }
 
-#game-window > nav svg {
+#game-popup > nav svg {
   width: 32px;
   aspect-ratio: 1/1;
 
@@ -379,20 +379,20 @@ main > div.right > div.stats {
   user-select: none;
 }
 
-#game-window > nav svg:hover {
+#game-popup > nav svg:hover {
   fill: var(--color-accent);
 }
 
-#game-window > nav svg:active {
+#game-popup > nav svg:active {
   scale: 0.95;
 }
 
-#game-window > nav > div.options {
+#game-popup > nav > div.options {
   gap: 16px;
   display: flex;
 }
 
-#game-window > div.mid {
+#game-popup > div.mid {
   grid-row: 2;
   grid-column: 2;
 
@@ -403,12 +403,12 @@ main > div.right > div.stats {
   place-items: center;
 }
 
-#game-window > div.mid > canvas {
+#game-popup > div.mid > canvas {
   width: 100%;
   aspect-ratio: 1/1;
 }
 
-#game-window > div.left {
+#game-popup > div.left {
   gap: 16px;
   display: flex;
   flex-direction: column;
@@ -417,7 +417,7 @@ main > div.right > div.stats {
   max-width: 350px;
 }
 
-#game-window > div.left > div.player {
+#game-popup > div.left > div.player {
   --avatar-size: calc(var(--game-margin) * 2);
 
   display: grid;
@@ -425,7 +425,7 @@ main > div.right > div.stats {
   grid-template-columns: var(--game-margin) var(--avatar-size) 1fr min-content;
 }
 
-#game-window > div.left > div.player > div.turn-marker {
+#game-popup > div.left > div.player > div.turn-marker {
   --turn-marker-width: calc(var(--game-margin) / 4);
   --turn-marker-border-radius: calc(var(--turn-marker-width) / 2);
 
@@ -443,11 +443,11 @@ main > div.right > div.stats {
   background-color: var(--color-midbackground);
 }
 
-#game-window > div.left > div.player.active > div.turn-marker {
+#game-popup > div.left > div.player.active > div.turn-marker {
   background-color: var(--color-accent);
 }
 
-#game-window > div.left > div.player > div.avatar {
+#game-popup > div.left > div.player > div.avatar {
   width: 100%;
   aspect-ratio: 1/1;
 
@@ -461,11 +461,11 @@ main > div.right > div.stats {
   background-color: var(--color-midbackground);
 }
 
-#game-window > div.left > div.player.active > div.avatar {
+#game-popup > div.left > div.player.active > div.avatar {
   background-color: var(--color-accent);
 }
 
-#game-window > div.left > div.player > div.user {
+#game-popup > div.left > div.player > div.user {
   font-family: var(--font-family);
   font-weight: 500;
 
@@ -475,17 +475,17 @@ main > div.right > div.stats {
   margin: 0 calc(var(--game-margin) / 2);
 }
 
-#game-window > div.left > div.player > div.user > div.displayname {
+#game-popup > div.left > div.player > div.user > div.displayname {
   color: var(--color-foreground);
   font-size: 1.125rem;
 }
 
-#game-window > div.left > div.player > div.user > div.handle {
+#game-popup > div.left > div.player > div.user > div.handle {
   color: var(--color-midforeground);
   font-size: 1rem;
 }
 
-#game-window > div.left > div.player > div.clock {
+#game-popup > div.left > div.player > div.clock {
   --clock-border-width: 4px;
 
   grid-row: 2;
@@ -504,7 +504,7 @@ main > div.right > div.stats {
   box-sizing: border-box;
 }
 
-#game-window > div.left > div.player > div.clock > div {
+#game-popup > div.left > div.player > div.clock > div {
   --vertical-padding: calc(7.5px - var(--clock-border-width));
   --horizontal-padding: calc(10px - var(--clock-border-width));
 
@@ -515,15 +515,15 @@ main > div.right > div.stats {
   background-color: var(--color-midbackground);
 }
 
-#game-window > div.left > div.player.active > div.clock {
+#game-popup > div.left > div.player.active > div.clock {
   border-color: var(--color-accent);
 }
 
-#game-window > div.left > div.player.active > div.clock > div {
+#game-popup > div.left > div.player.active > div.clock > div {
   background-color: var(--color-accent);
 }
 
-#game-window > div.left > div.player > div.clock > div > div {
+#game-popup > div.left > div.player > div.clock > div > div {
   font-size: 0.875rem;
   font-family: var(--font-family);
   font-weight: 900;
@@ -535,7 +535,7 @@ main > div.right > div.stats {
   filter: invert(1);
 }
 
-#game-window > div.left > div.player > svg {
+#game-popup > div.left > div.player > svg {
   width: 24px;
   cursor: pointer;
   aspect-ratio: 1/1;
@@ -546,15 +546,15 @@ main > div.right > div.stats {
   fill: var(--color-foreground);
 }
 
-#game-window > div.left > div.player > svg:hover {
+#game-popup > div.left > div.player > svg:hover {
   fill: var(--color-accent);
 }
 
-#game-window > div.left > div.player > svg:active {
+#game-popup > div.left > div.player > svg:active {
   scale: 0.85;
 }
 
-#game-window > div.right {
+#game-popup > div.right {
   grid-row: 2;
   grid-column: 3;
 
@@ -562,11 +562,11 @@ main > div.right > div.stats {
   margin-right: var(--game-margin);
 }
 
-#game-window > div.right::-webkit-scrollbar {
+#game-popup > div.right::-webkit-scrollbar {
   display: none;
 }
 
-#game-window > div.footer {
+#game-popup > div.footer {
   grid-row: 3;
   grid-column: 1 / 4;
 
@@ -576,7 +576,7 @@ main > div.right > div.stats {
   justify-content: right;
 }
 
-#game-window > div.footer > svg {
+#game-popup > div.footer > svg {
   width: 32px;
   aspect-ratio: 1/1;
 
@@ -590,10 +590,10 @@ main > div.right > div.stats {
   cursor: pointer;
 }
 
-#game-window > div.footer > svg:hover {
+#game-popup > div.footer > svg:hover {
   fill: var(--color-accent);
 }
 
-#game-window > div.footer > svg:active {
+#game-popup > div.footer > svg:active {
   scale: 0.85;
 }

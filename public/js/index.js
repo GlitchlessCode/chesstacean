@@ -1,69 +1,75 @@
+"use strict";
 
-import "./modules/ca.chesstacean.components.js";
-import "./web-components/registry.js";
+import { Coordinate } from "./components.js";
 
-const nav        = document.querySelector("body > nav");
-const main       = document.querySelector("body > main");
-
-const gameWindow = document.getElementById("game-window");
-
-window.openGameWindow = async () => {
-	gameWindow.classList.add("active");
-
-	setTimeout(() => {
-		nav.style.display = "none";
-		main.style.display = "none";
-	}, 200); // transition time of .2s
-}
-
-window.closeGameWindow = () => {
-	gameWindow.classList.remove("active");
-
-	nav.removeAttribute('style');
-	main.removeAttribute('style');
-}
+// canvas setup
 
 /** @type {HTMLCanvasElement} */
 const cnv = document.getElementById("game-board");
 const ctx = cnv.getContext('2d');
 
+// canvas movement
+
+/** @type {{x: number, y: number} | false} */
+let dragging = false;
+let cameraX  = 0;
+let cameraY  = 0;
+
+cnv.addEventListener("mousedown", e => dragging = {
+	x: e.clientX,
+	y: e.clientY,
+});
+
+cnv.addEventListener("mousemove", e => {
+	// TODO: FIX CAMERA MOVEMNT SPEED
+	// TODO: ADD CAMERA Y MANIPULATION AND ZOOM
+
+	if (!dragging)
+		return;
+
+	cameraX -= (e.clientX - dragging.x) / 2;
+
+	requestAnimationFrame(update);
+});
+
+// stop dragging regardless of if on canvas anymore or not
+addEventListener("mouseup", e => dragging = false);
+
 const gridWidth  = 8;
 const gridHeight = 4;
 
-const lineWidth = 2;
+const lineThickness = 2;
 
 requestAnimationFrame(update);
-
-class Coordinate {
-	x;
-	y;
-
-	/**
-	 * @param {number} x
-	 * @param {number} y
-	 */
-	constructor(x, y) {
-		this.x = x;
-		this.y = y;
-	}
-}
 
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
 
-	// draw tiles
+	// calculate the size of each tile
 
-	const gridboxWidth  = cnv.width  / gridWidth;
-	const gridboxHeight = cnv.height / gridHeight;
+	const tileSize = (() => {
+		const tileWidth  = cnv.width  / gridWidth;
+		const tileHeight = cnv.height / gridHeight;
 
-	const gridboxSize   = Math.min(gridboxWidth, gridboxHeight);
+		return Math.min(tileWidth, tileHeight);
+	})();
 
-	const boardPosition = {
-		top:    (cnv.height - gridboxSize * gridHeight) / 2,
-		left:   (cnv.width  - gridboxSize * gridWidth ) / 2,
-		right:  cnv.width  - (cnv.width  - gridboxSize * gridWidth) / 2,
-		bottom: cnv.height - (cnv.height - gridboxSize * gridHeight) / 2,
-	};
+	// calculate the board positions
+	// center the grid within the board
+
+	const board  = {};
+
+	board.top    = (cnv.height - tileSize * gridHeight) / 2;
+	board.left   = (cnv.width  - tileSize * gridWidth ) / 2;
+	board.right  =  cnv.width  - board.left;
+	board.bottom =  cnv.height - board.top;
+
+	// offset board positions by camera position
+
+	board.top    -= cameraY;
+	board.left   -= cameraX;
+	board.right  -= cameraX;
+	board.bottom -= cameraY;
 
 	// draw tiles
 
@@ -72,10 +78,10 @@ function update() {
 	for (let col = 0; col < gridHeight; col++)
 		// col % 2 is used to checker the board by switching the starting position
 		for (let row = col % 2; row < gridWidth; row += 2) {
-			const x = boardPosition.left + gridboxSize * row;
-			const y = boardPosition.top  + gridboxSize * col;
+			const x = board.left + tileSize * row;
+			const y = board.top  + tileSize * col;
 
-			ctx.rect(x, y, gridboxSize, gridboxSize);
+			ctx.rect(x, y, tileSize, tileSize);
 		}
 
 	ctx.fill();
@@ -83,45 +89,45 @@ function update() {
 	// draw vertical lines
 
 	for (let i = 1; i < gridWidth; i++) {
-		const x = boardPosition.left + gridboxSize * i;
+		const x = board.left + tileSize * i;
 
 		drawLine(
-			new Coordinate(x, boardPosition.top   ),
-			new Coordinate(x, boardPosition.bottom),
+			new Coordinate(x, board.top   ),
+			new Coordinate(x, board.bottom),
 		);
 	}
 
 	// draw horizontal lines
 
 	for (let i = 1; i < gridHeight; i++) {
-		const y = boardPosition.top + gridboxSize * i;
+		const y = board.top + tileSize * i;
 
 		drawLine(
-			new Coordinate(boardPosition.left,  y),
-			new Coordinate(boardPosition.right, y),
+			new Coordinate(board.left,  y),
+			new Coordinate(board.right, y),
 		);
 	}
 
 	// draw borders
 
 	drawLine(
-		new Coordinate(boardPosition.left,  boardPosition.top   ),
-		new Coordinate(boardPosition.left,  boardPosition.bottom),
+		new Coordinate(board.left,  board.top   ),
+		new Coordinate(board.left,  board.bottom),
 	);
 
 	drawLine(
-		new Coordinate(boardPosition.left,  boardPosition.top   ),
-		new Coordinate(boardPosition.right, boardPosition.top   ),
+		new Coordinate(board.left,  board.top   ),
+		new Coordinate(board.right, board.top   ),
 	);
 
 	drawLine(
-		new Coordinate(boardPosition.right, boardPosition.top   ),
-		new Coordinate(boardPosition.right, boardPosition.bottom),
+		new Coordinate(board.right, board.top   ),
+		new Coordinate(board.right, board.bottom),
 	);
 
 	drawLine(
-		new Coordinate(boardPosition.left,  boardPosition.bottom),
-		new Coordinate(boardPosition.right, boardPosition.bottom),
+		new Coordinate(board.left,  board.bottom),
+		new Coordinate(board.right, board.bottom),
 	);
 
 	// draw numbering and lettering
@@ -159,7 +165,6 @@ function update() {
 	// 	ctx.fillText(label, letteringX, letteringY);
 	// }
 
-	// TODO: ADD ZOOM TO CHESSBOARD
 	// TODO: MAKE NUMBERING/LETTERING + LABEL MARGIN SCALE WITH TILE SIZE
 }
 
@@ -173,7 +178,7 @@ function drawLine(first, final) {
 	ctx.lineTo(final.x, final.y);
 
 	ctx.strokeStyle = "#666666";
-	ctx.lineWidth   = lineWidth;
+	ctx.lineWidth   = lineThickness;
 	ctx.stroke();
 };
 
