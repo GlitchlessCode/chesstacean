@@ -15,14 +15,6 @@ async fn main() {
     let (database, db_tx) = database::init();
 
     tokio::task::spawn(database);
-    // "127.0.0.1:50240"
-    let ip = SocketAddr::from(([127, 0, 0, 1], 50240));
-
-    let thing = move |db: &Database| DatabaseResult::from(db.sessions().create_new_session(ip));
-
-    let result = DatabaseMessage::send(thing, &db_tx).await.unwrap();
-
-    eprintln!("{result}");
 
     // Create routes and mpsc for WebSockets
     let (ws_tx, ws_rx) = mpsc::channel(1);
@@ -30,7 +22,10 @@ async fn main() {
     let user_registry = Registry::new();
     tokio::task::spawn(user_registry.start(ws_rx));
 
-    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), ws_tx));
+    let routes = routes::attach_404(routes::ws_make(
+        routes::page_make(routes::static_make(), db_tx.clone()),
+        ws_tx,
+    ));
 
     let mut args = env::args();
     args.next();

@@ -89,12 +89,38 @@ pub struct Sessions<'a> {
 
 impl<'a> Sessions<'a> {
     fn check_expiry(&self, cookie: &str) {
-        let stmnt = self
+        let mut stmnt = self
             .conn
             .prepare_cached("SELECT expiry FROM sessions WHERE cookie = ?1")
             .expect("Should be a valid sql statement");
 
         let time = get_timestamp();
+
+        let expiry: Vec<Result<u64, rusqlite::Error>> =
+            match stmnt.query_map(params![cookie], |row| row.get::<usize, u64>(0)) {
+                Ok(mapped) => mapped.collect(),
+                Err(_) => return,
+            };
+
+        if expiry.len() != 1 {
+            return;
+        }
+
+        let expiry = match expiry.into_iter().next() {
+            Some(res) => res.expect("Should never be err"),
+            None => return,
+        };
+
+        if time > expiry as u128 {
+            let mut stmnt = self
+                .conn
+                .prepare_cached("UPDATE sessions SET invalid = 1 WHERE cookie = ?1")
+                .expect("Should be a valid sql statement");
+
+            match stmnt.execute(params![cookie]) {
+                _ => return,
+            };
+        }
     }
     pub fn validate_session(&self, cookie: &str) -> bool {
         self.check_expiry(cookie);
@@ -291,7 +317,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             cookie TEXT NOT NULL UNIQUE,
             user INTEGER,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 3600000),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 14400000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
        );",
@@ -303,7 +329,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             token TEXT NOT NULL UNIQUE,
             session INTEGER NOT NULL,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 3600000),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 14400000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_session FOREIGN KEY (session) REFERENCES sessions(id)
        );",
@@ -351,7 +377,7 @@ fn get_tables() -> Vec<TableInfo> {
                 .kind("INTEGER")
                 .not_null(true)
                 .default_value(Some(
-                    "ROUND((julianday('now') - 2440587.5)*86400000) + 3600000".to_owned(),
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 14400000".to_owned(),
                 )),
             ColumnInfo::default()
                 .name("invalid")
@@ -372,7 +398,7 @@ fn get_tables() -> Vec<TableInfo> {
                 .kind("INTEGER")
                 .not_null(true)
                 .default_value(Some(
-                    "ROUND((julianday('now') - 2440587.5)*86400000) + 3600000".to_owned(),
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 14400000".to_owned(),
                 )),
             ColumnInfo::default()
                 .name("invalid")

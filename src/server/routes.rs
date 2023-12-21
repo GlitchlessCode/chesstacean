@@ -1,9 +1,13 @@
 use std::net::{IpAddr, SocketAddr};
 
 use http::{Response, StatusCode};
+use rand::{thread_rng, Rng};
 use warp::{filters::fs::File, reply::Reply};
 
-use super::*;
+use super::{
+    database::{Database, DatabaseMessage, DatabaseResult},
+    *,
+};
 
 /// ### Creates the server's static files
 ///
@@ -55,19 +59,31 @@ pub fn ws_make(
 /// Returns a `warp::Filter`, which can be subsquently chained into other filters
 pub fn page_make(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
+    db_tx: mpsc::Sender<DatabaseMessage>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
     let home_route = warp::path::end()
         .and(warp::get())
         .and(warp::cookie::optional("auth"))
         .and(warp::fs::file("./public/pages/index.html"))
         .and(warp::filters::addr::remote())
-        .map(has_auth_cookie);
+        .and_then(move |cookie, file, ip| {
+            let tx = db_tx.clone();
+            async move { auth_cookie(cookie, file, ip, tx).await }
+        });
 
     let login_route = warp::path("login").and(warp::fs::file("./public/pages/login/index.html"));
 
     home_route.or(login_route).or(routes)
 }
 
+/// ### Creates the server's 404 page.
+///
+/// Keep in mind, the values are hardcoded into this function (at least for now),
+/// because they really just won't be changing.
+///
+/// Returns a `warp::Filter`, which can be subsquently chained into other filters,
+/// though this filter is intended be the last filter applied in a chain, as it
+/// acts as a catchall
 pub fn attach_404(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
@@ -82,15 +98,68 @@ pub fn attach_404(
     routes.or(none_found_route)
 }
 
-fn has_auth_cookie(cookie: Option<String>, file: File, ip: Option<SocketAddr>) -> impl Reply {
-    eprintln!(
-        "{}",
-        ip.unwrap_or(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
-    );
+async fn auth_cookie(
+    cookie: Option<String>,
+    file: File,
+    ip: Option<SocketAddr>,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+) -> Result<impl Reply, warp::Rejection> {
     match cookie {
-        None => warp::reply::with_header(file, "set-cookie", "auth=xyz; HttpOnly; SameSite=Strict"),
-        Some(_cookie) => warp::reply::with_header(file, "set-cookie", "auth=xyz; HttpOnly; SameSite=Strict"),
+        None => Ok(warp::reply::with_header(
+            file,
+            "set-cookie",
+            format!("auth={}; HttpOnly; SameSite=Strict", create_cookie(&db_tx, ip).await),
+        )),
+        Some(cookie) => {
+            if validate_cookie(&db_tx, cookie.to_owned()).await {
+                Ok(warp::reply::with_header(
+                    file,
+                    "set-cookie",
+                    format!("auth={}; HttpOnly; SameSite=Strict", cookie),
+                ))
+            } else {
+                Ok(warp::reply::with_header(
+                    file,
+                    "set-cookie",
+                    format!("auth={}; HttpOnly; SameSite=Strict", create_cookie(&db_tx, ip).await),
+                ))
+            }
+        }
     }
+}
+
+async fn create_cookie(db_tx: &mpsc::Sender<DatabaseMessage>, ip: Option<SocketAddr>) -> String {
+    let func =
+        move |db: &Database| DatabaseResult::from(db.sessions().create_new_session(ip.unwrap_or_else(random_ip)));
+    let result = DatabaseMessage::send(func, &db_tx)
+        .await
+        .expect("Should panic if no session cookie could be created");
+
+    match result {
+        DatabaseResult::ResultString(r) => r.expect("Should panic if no session cookie could be created"),
+        _ => panic!("Should always be a Result<String>"),
+    }
+}
+
+async fn validate_cookie(db_tx: &mpsc::Sender<DatabaseMessage>, cookie: String) -> bool {
+    let func = move |db: &Database| DatabaseResult::from(db.sessions().validate_session(cookie.as_str()));
+    let result = DatabaseMessage::send(func, &db_tx)
+        .await
+        .expect("Should panic if no session cookie could be created");
+
+    match result {
+        DatabaseResult::Bool(b) => b,
+        _ => panic!("Should always be a bool"),
+    }
+}
+
+fn random_ip() -> SocketAddr {
+    let mut rand = [0u8; 5];
+    thread_rng().fill(&mut rand);
+    SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(rand[0], rand[1], rand[2], rand[3])),
+        rand[4] as u16,
+    )
 }
 
 async fn ws_connected(websocket: WebSocket, ws_target: mpsc::Sender<Connection>) {
