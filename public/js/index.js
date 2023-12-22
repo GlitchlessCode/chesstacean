@@ -8,6 +8,13 @@ import { Coordinate } from "./components.js";
 const cnv = document.getElementById("game-board");
 const ctx = cnv.getContext('2d');
 
+// board tracking
+
+const gridWidth  = 8;
+const gridHeight = 4;
+
+const lineThickness = 2;
+
 // canvas movement
 
 /** @type {{x: number, y: number} | false} */
@@ -15,32 +22,45 @@ let dragging = false;
 let cameraX  = 0;
 let cameraY  = 0;
 
-cnv.addEventListener("mousedown", e => dragging = {
-	x: e.clientX,
-	y: e.clientY,
+let maxOffsetX = 0;
+let maxOffsetY = 0;
+
+cnv.addEventListener("mousedown", e => {
+	const rect = cnv.getBoundingClientRect();
+
+	dragging = {
+		x: e.clientX - rect.left + cameraX,
+		y: e.clientY - rect.top  + cameraY,
+	};
 });
 
 cnv.addEventListener("mousemove", e => {
-	// TODO: FIX CAMERA MOVEMNT SPEED
+	// TODO: FIX CAMERA MOVEMENT SPEED
 	// TODO: ADD CAMERA Y MANIPULATION AND ZOOM
+	// TODO: PREVENT DRAGGING BOARD OUTSIDE FRAME
 
 	if (!dragging)
 		return;
 
-	cameraX -= (e.clientX - dragging.x) / 2;
+	const rect = cnv.getBoundingClientRect();
+
+	cnv.setAttribute("width",  rect.width );
+	cnv.setAttribute("height", rect.height);
+
+	cameraX = dragging.x - (e.clientX - rect.left);
+	cameraY = dragging.y - (e.clientY - rect.top );
+
+	if (Math.abs(cameraX) > maxOffsetX)
+		cameraX = maxOffsetX * Math.sign(cameraX);
+
+	if (Math.abs(cameraY) > maxOffsetY)
+		cameraY = maxOffsetY * Math.sign(cameraY);
 
 	requestAnimationFrame(update);
 });
 
 // stop dragging regardless of if on canvas anymore or not
 addEventListener("mouseup", e => dragging = false);
-
-const gridWidth  = 8;
-const gridHeight = 4;
-
-const lineThickness = 2;
-
-requestAnimationFrame(update);
 
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
@@ -63,6 +83,9 @@ function update() {
 	board.left   = (cnv.width  - tileSize * gridWidth ) / 2;
 	board.right  =  cnv.width  - board.left;
 	board.bottom =  cnv.height - board.top;
+
+	maxOffsetX = board.left;
+	maxOffsetY = board.top;
 
 	// offset board positions by camera position
 
@@ -189,3 +212,4 @@ cnv.addEventListener("resize", () => {
 
 cnv.dispatchEvent(new Event("resize"));
 
+requestAnimationFrame(update);

@@ -406,6 +406,8 @@ main > div.right > div.stats {
 #game-popup > div.mid > canvas {
   width: 100%;
   aspect-ratio: 1/1;
+
+  box-shadow: inset 0 0 10px var(--color-midforeground);
 }
 
 #game-popup > div.left {
