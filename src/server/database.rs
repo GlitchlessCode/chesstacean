@@ -1,9 +1,9 @@
 extern crate sha2;
 
 use super::user::User;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{self, rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use base64::{engine::general_purpose, Engine};
@@ -12,7 +12,8 @@ use rand::{thread_rng, Rng};
 use rusqlite::{config::DbConfig, params, Connection, Row};
 use sha2::{Digest, Sha256};
 use std::{
-    fmt::Display,
+    error::Error,
+    fmt::{format, Display},
     fs,
     net::SocketAddr,
     time::{SystemTime, UNIX_EPOCH},
@@ -75,47 +76,133 @@ pub struct Auth<'a> {
 }
 
 impl<'a> Auth<'a> {
-    fn hash_password(&self, info: &UserInfo, password: String) {}
+    /// ### Verify if a user exists or not
+    ///
+    /// Returns an `Option<UserInfo>`
+    ///
+    /// Will be `None` if no user is found
+    ///
+    /// Will be `Some(UserInfo)` if a user is found
     fn user_exists(&self, handle: String) -> Option<UserInfo> {
         let mut stmnt = self
             .conn
-            .prepare_cached("SELECT handle, salt, digest FROM users WHERE handle = ?1")
+            .prepare_cached("SELECT handle, phc FROM users WHERE handle = ?1")
             .expect("Should be a valid sql statement");
 
         match stmnt.query_row(params![handle], |row| Ok(UserInfo::from(row))) {
             Err(_) => None,
-            Ok(r) => {
-                eprintln!("{r:?}");
-                Some(r)
-            }
+            Ok(r) => Some(r),
         }
     }
-    pub fn create_user(&self) {}
-    pub fn validate_user(&self, handle: String, password: String) -> bool {
+
+    /// ### Creates a user from the provided handle, display name, and password
+    ///
+    /// All values MUST be validated BEFORE calling this function
+    ///
+    /// Returns an `anyhow::Result<bool>`
+    ///
+    /// If `Ok(bool)`, the bool indicates if the username is taken,
+    /// true for user created, false for username taken
+    pub fn create_user(&self, handle: String, display: String, password: String) -> Result<bool> {
+        if let None = self.user_exists(handle.clone()) {
+            let password = password.as_bytes();
+            let salt = SaltString::generate(&mut OsRng);
+
+            let phc = match self.argon2.hash_password(password, &salt) {
+                Err(e) => bail!(ArgonError::from(e)),
+                Ok(pwdh) => pwdh.to_string(),
+            };
+
+            let mut stmnt = self
+                .conn
+                .prepare_cached("INSERT INTO users (handle, display, phc) VALUES (?1, ?2, ?3)")
+                .expect("Should be a valid sql statement");
+
+            match stmnt.execute(params![handle, display, phc]) {
+                Err(_) => bail!(SQLError),
+                Ok(_) => (),
+            };
+
+            Ok(true)
+        } else {
+            return Ok(false);
+        }
+    }
+
+    /// ### Validate a user login the user's handle and password
+    ///
+    /// Returns an `anyhow::Result<bool>`
+    ///
+    /// If `Ok(bool)`, the bool indicates if the login is valid,
+    /// true for valid, false for invalid
+    pub fn validate_user(&self, handle: String, password: String) -> Result<bool> {
         match self.user_exists(handle) {
-            None => false,
+            None => Ok(false),
             Some(info) => {
-                self.hash_password(&info, password);
-                true
+                let password = password.as_bytes();
+                let hash = match PasswordHash::new(&info.phc) {
+                    Err(e) => bail!(ArgonError::from(e)),
+                    Ok(pwdh) => pwdh,
+                };
+                Ok(self.argon2.verify_password(&password, &hash).is_ok())
             }
         }
     }
-    pub fn update_user(&self) {}
+
+    /// ### Update a user's password, requiring the previous password
+    pub fn update_password(&self) {}
 }
+
+#[derive(Debug)]
+pub enum ArgonError {
+    HashError,
+    EncodingError,
+    UnknownError,
+}
+
+impl From<password_hash::Error> for ArgonError {
+    fn from(value: password_hash::Error) -> Self {
+        match value {
+            password_hash::Error::SaltInvalid(_) => Self::HashError,
+            password_hash::Error::Algorithm => Self::HashError,
+            password_hash::Error::B64Encoding(_) => Self::EncodingError,
+            password_hash::Error::Crypto => Self::HashError,
+            password_hash::Error::Version => Self::HashError,
+            _ => Self::UnknownError,
+        }
+    }
+}
+
+impl Display for ArgonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for ArgonError {}
+
+#[derive(Debug)]
+pub struct SQLError;
+
+impl Display for SQLError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for SQLError {}
 
 #[derive(Debug)]
 pub struct UserInfo {
     handle: String,
-    salt: String,
-    digest: String,
+    phc: String,
 }
 
 impl<'stmnt> From<&Row<'stmnt>> for UserInfo {
     fn from(row: &Row<'stmnt>) -> Self {
         Self {
             handle: row.get_unwrap("handle"),
-            salt: row.get_unwrap("salt"),
-            digest: row.get_unwrap("digest"),
+            phc: row.get_unwrap("phc"),
         }
     }
 }
@@ -231,7 +318,7 @@ pub enum DatabaseResult {
     Bool(bool),
     String(String),
     ResultString(Result<String>),
-    TempOption(bool),
+    ResultBool(Result<bool>),
 }
 
 impl From<bool> for DatabaseResult {
@@ -258,9 +345,9 @@ impl From<Result<String>> for DatabaseResult {
     }
 }
 
-impl From<Option<UserInfo>> for DatabaseResult {
-    fn from(value: Option<UserInfo>) -> Self {
-        Self::TempOption(value.is_some())
+impl From<Result<bool>> for DatabaseResult {
+    fn from(value: Result<bool>) -> Self {
+        Self::ResultBool(value)
     }
 }
 
@@ -272,8 +359,8 @@ impl Display for DatabaseResult {
             match self {
                 Self::Bool(b) => b.to_string(),
                 Self::String(s) => s.to_string(),
-                Self::ResultString(r) => format!("{:?}", r),
-                Self::TempOption(b) => b.to_string(),
+                Self::ResultString(r) => format!("{r:?}"),
+                Self::ResultBool(b) => format!("{b:?}"),
             }
         )
     }
@@ -339,8 +426,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
         id INTEGER PRIMARY KEY,
         handle TEXT NOT NULL UNIQUE,
         display TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        digest TEXT NOT NULL
+        phc TEXT NOT NULL
    );",
         [],
     )?;
@@ -396,8 +482,7 @@ fn get_tables() -> Vec<TableInfo> {
             ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
             ColumnInfo::default().name("handle").not_null(true),
             ColumnInfo::default().name("display").not_null(true),
-            ColumnInfo::default().name("salt").not_null(true),
-            ColumnInfo::default().name("digest").not_null(true),
+            ColumnInfo::default().name("phc").not_null(true),
         ],
     });
 
