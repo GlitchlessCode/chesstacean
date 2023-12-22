@@ -59,8 +59,9 @@ pub fn ws_make(
 /// Returns a `warp::Filter`, which can be subsquently chained into other filters
 pub fn page_make(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
-    db_tx: mpsc::Sender<DatabaseMessage>,
+    db_tx: &mpsc::Sender<DatabaseMessage>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
+    let db_tx = db_tx.clone();
     let home_tx = db_tx.clone();
     let home_route = warp::path::end()
         .and(warp::get())
@@ -83,6 +84,26 @@ pub fn page_make(
         });
 
     home_route.or(login_route).or(routes)
+}
+
+/// ### Creates the server's POST request recievers
+///
+/// Some additionally **require** the `auth` cookie.
+pub fn post_make(
+    routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
+    db_tx: &mpsc::Sender<DatabaseMessage>,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
+    let auth_base = warp::post().and(warp::path("auth"));
+
+    let login = warp::path("login")
+        .and(warp::filters::cookie::cookie("auth"))
+        .map(|cookie: String| format!("Login; Cookie:{}", cookie));
+
+    let signup = warp::path("signup")
+        .and(warp::filters::cookie::cookie("auth"))
+        .map(|cookie: String| format!("Sign Up; Cookie:{}", cookie));
+
+    routes.or(auth_base.and(login.or(signup)))
 }
 
 /// ### Creates the server's 404 page.

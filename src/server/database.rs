@@ -13,7 +13,7 @@ use rusqlite::{config::DbConfig, params, Connection, Row};
 use sha2::{Digest, Sha256};
 use std::{
     error::Error,
-    fmt::{format, Display},
+    fmt::Display,
     fs,
     net::SocketAddr,
     time::{SystemTime, UNIX_EPOCH},
@@ -83,13 +83,13 @@ impl<'a> Auth<'a> {
     /// Will be `None` if no user is found
     ///
     /// Will be `Some(UserInfo)` if a user is found
-    fn user_exists(&self, handle: String) -> Option<UserInfo> {
+    fn user_exists(&self, handle: String) -> Option<String> {
         let mut stmnt = self
             .conn
             .prepare_cached("SELECT handle, phc FROM users WHERE handle = ?1")
             .expect("Should be a valid sql statement");
 
-        match stmnt.query_row(params![handle], |row| Ok(UserInfo::from(row))) {
+        match stmnt.query_row(params![handle], |row| Ok(row.get_unwrap("phc"))) {
             Err(_) => None,
             Ok(r) => Some(r),
         }
@@ -138,9 +138,9 @@ impl<'a> Auth<'a> {
     pub fn validate_user(&self, handle: String, password: String) -> Result<bool> {
         match self.user_exists(handle) {
             None => Ok(false),
-            Some(info) => {
+            Some(phc) => {
                 let password = password.as_bytes();
-                let hash = match PasswordHash::new(&info.phc) {
+                let hash = match PasswordHash::new(&phc) {
                     Err(e) => bail!(ArgonError::from(e)),
                     Ok(pwdh) => pwdh,
                 };
@@ -191,21 +191,6 @@ impl Display for SQLError {
 }
 
 impl Error for SQLError {}
-
-#[derive(Debug)]
-pub struct UserInfo {
-    handle: String,
-    phc: String,
-}
-
-impl<'stmnt> From<&Row<'stmnt>> for UserInfo {
-    fn from(row: &Row<'stmnt>) -> Self {
-        Self {
-            handle: row.get_unwrap("handle"),
-            phc: row.get_unwrap("phc"),
-        }
-    }
-}
 
 pub struct Sessions<'a> {
     conn: &'a Connection,

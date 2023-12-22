@@ -1,10 +1,4 @@
-use chesstacean::server::{
-    self,
-    database::{self, Database, DatabaseMessage, DatabaseResult},
-    routes,
-    user::registry::Registry,
-    ServerConfig,
-};
+use chesstacean::server::{self, database, routes, user::registry::Registry, ServerConfig};
 use std::env;
 use tokio::sync::mpsc;
 
@@ -12,8 +6,8 @@ use tokio::sync::mpsc;
 async fn main() {
     eprint!("\x1b[2J");
 
+    // Create and start database thread
     let (database, db_tx) = database::init();
-
     tokio::task::spawn(database);
 
     // Create routes and mpsc for WebSockets
@@ -23,7 +17,7 @@ async fn main() {
     tokio::task::spawn(user_registry.start(ws_rx));
 
     let routes = routes::attach_404(routes::ws_make(
-        routes::page_make(routes::static_make(), db_tx.clone()),
+        routes::post_make(routes::page_make(routes::static_make(), &db_tx), &db_tx),
         ws_tx,
     ));
 
