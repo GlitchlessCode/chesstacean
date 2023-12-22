@@ -14,3 +14,5 @@ impl Board {
         Board::new(8, 8)
     }
 }
+
+// Implement a mailbox board representation to accomodate for any board size
