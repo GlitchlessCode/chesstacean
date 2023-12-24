@@ -4,10 +4,14 @@ use http::{Response, StatusCode};
 use rand::{thread_rng, Rng};
 use warp::{filters::fs::File, reply::Reply};
 
+use self::reply::{Message, Status::Success};
+
 use super::{
     database::{Database, DatabaseMessage, DatabaseResult},
     *,
 };
+
+pub mod reply;
 
 /// ### Creates the server's static files
 ///
@@ -97,7 +101,14 @@ pub fn post_make(
 
     let login = warp::path("login")
         .and(warp::filters::cookie::cookie("auth"))
-        .map(|cookie: String| format!("Login; Cookie:{}", cookie));
+        .map(|cookie: String| {
+            serde_json::to_string(&Message::Login {
+                status: Success {
+                    context: Some("Login".to_string()),
+                },
+            })
+            .unwrap_or("Error serializing response".to_string())
+        });
 
     let signup = warp::path("signup")
         .and(warp::filters::cookie::cookie("auth"))

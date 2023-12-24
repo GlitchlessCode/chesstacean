@@ -68,6 +68,14 @@ impl Database {
             argon2: Argon2::default(),
         }
     }
+
+    pub fn tokens<'a>(&'a self) -> Tokens<'a> {
+        Tokens { conn: &self.conn }
+    }
+}
+
+pub struct Tokens<'a> {
+    conn: &'a Connection,
 }
 
 pub struct Auth<'a> {
@@ -155,27 +163,35 @@ impl<'a> Auth<'a> {
 
 #[derive(Debug)]
 pub enum ArgonError {
-    HashError,
-    EncodingError,
-    UnknownError,
+    HashError(password_hash::Error),
+    EncodingError(password_hash::Error),
+    UnknownError(password_hash::Error),
 }
 
 impl From<password_hash::Error> for ArgonError {
     fn from(value: password_hash::Error) -> Self {
         match value {
-            password_hash::Error::SaltInvalid(_) => Self::HashError,
-            password_hash::Error::Algorithm => Self::HashError,
-            password_hash::Error::B64Encoding(_) => Self::EncodingError,
-            password_hash::Error::Crypto => Self::HashError,
-            password_hash::Error::Version => Self::HashError,
-            _ => Self::UnknownError,
+            password_hash::Error::SaltInvalid(_) => Self::HashError(value),
+            password_hash::Error::Algorithm => Self::HashError(value),
+            password_hash::Error::B64Encoding(_) => Self::EncodingError(value),
+            password_hash::Error::Crypto => Self::HashError(value),
+            password_hash::Error::Version => Self::HashError(value),
+            _ => Self::UnknownError(value),
         }
     }
 }
 
 impl Display for ArgonError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::HashError(err) => format!("HashError: {}", err),
+                Self::EncodingError(err) => format!("EncodingError: {}", err),
+                Self::UnknownError(err) => format!("UnknownError: {}", err),
+            }
+        )
     }
 }
 
