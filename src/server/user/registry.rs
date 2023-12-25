@@ -1,5 +1,4 @@
 use super::*;
-use crate::server::ws::Connection;
 use futures_util::StreamExt;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc::Receiver, RwLock};

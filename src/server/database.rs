@@ -1,40 +1,37 @@
-use super::user::User;
-use anyhow::Result;
-use rusqlite::{config::DbConfig, params, Connection, Row};
-use std::fs;
+extern crate sha2;
 
-pub fn init() -> Database {
+use super::user::User;
+use anyhow::{bail, Result};
+use argon2::{
+    password_hash::{self, rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
+use base64::{engine::general_purpose, Engine};
+use futures_util::Future;
+use rand::{thread_rng, Rng};
+use rusqlite::{config::DbConfig, params, Connection, Row};
+use sha2::{Digest, Sha256};
+use std::{
+    error::Error,
+    fmt::Display,
+    fs,
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::sync::mpsc::{self, Receiver, Sender};
+
+pub fn init() -> (impl Future<Output = ()>, Sender<DatabaseMessage>) {
     let path = "./db/";
 
     fs::create_dir_all(path.to_owned()).expect(&format!("Failed to open or create directory at {path}"));
-    let database = Connection::open(path.to_owned() + "chesstacean.db3")
+    let conn = Connection::open(path.to_owned() + "chesstacean.db3")
         .expect(&format!("Failed to open or create database at {path}chesstacean.db3"));
 
-    Database::new(database)
+    let database = Database::new(conn);
 
-    // let mut stmnt = database
-    //     .prepare("INSERT INTO games(black, white, moves) VALUES (?1, ?2, ?3)")
-    //     .unwrap();
-    // stmnt.execute(rusqlite::params![1, 2, "7,6>7,4;4,1>4,3;"]).unwrap(); // DOES NOT FAIL
-    // match stmnt.execute(rusqlite::params![1, 5, "7,6>7,4;"]) { // FAILS BECAUSE OF FK CONSTRAINT
-    //     Ok(_) => (),
-    //     Err(e) => eprintln!("E: {}", e),
-    // };
+    let (tx, rx) = mpsc::channel(1);
 
-    // This was succesfully sanitized
-    // let params = rusqlite::params![
-    //     "glitchlesscode",
-    //     "Timothy",
-    //     "1234",
-    //     "password1234); DROP TABLE users; --",
-    // ];
-
-    // database
-    //     .execute(
-    //         "INSERT INTO users(handle, display, salt, digest) VALUES (?1, ?2, ?3, ?4)",
-    //         params,
-    //     )
-    //     .unwrap();
+    (database.start(rx), tx)
 }
 
 pub struct Database {
@@ -54,17 +51,204 @@ impl Database {
         Self { conn: database }
     }
 
+    async fn start(self, mut db_rx: Receiver<DatabaseMessage>) -> () {
+        while let Some(db_msg) = db_rx.recv().await {
+            db_msg.run(&self);
+        }
+        panic!("db_rx mspc channel was closed: this channel should never close");
+    }
+
     pub fn sessions<'a>(&'a self) -> Sessions<'a> {
         Sessions { conn: &self.conn }
     }
+
+    pub fn auth<'a>(&'a self) -> Auth<'a> {
+        Auth {
+            conn: &self.conn,
+            argon2: Argon2::default(),
+        }
+    }
+
+    pub fn tokens<'a>(&'a self) -> Tokens<'a> {
+        Tokens { conn: &self.conn }
+    }
 }
+
+pub struct Tokens<'a> {
+    conn: &'a Connection,
+}
+
+pub struct Auth<'a> {
+    conn: &'a Connection,
+    argon2: Argon2<'a>,
+}
+
+impl<'a> Auth<'a> {
+    /// ### Verify if a user exists or not
+    ///
+    /// Returns an `Option<UserInfo>`
+    ///
+    /// Will be `None` if no user is found
+    ///
+    /// Will be `Some(UserInfo)` if a user is found
+    fn user_exists(&self, handle: String) -> Option<String> {
+        let mut stmnt = self
+            .conn
+            .prepare_cached("SELECT handle, phc FROM users WHERE handle = ?1")
+            .expect("Should be a valid sql statement");
+
+        match stmnt.query_row(params![handle], |row| Ok(row.get_unwrap("phc"))) {
+            Err(_) => None,
+            Ok(r) => Some(r),
+        }
+    }
+
+    /// ### Creates a user from the provided handle, display name, and password
+    ///
+    /// All values MUST be validated BEFORE calling this function
+    ///
+    /// Returns an `anyhow::Result<bool>`
+    ///
+    /// If `Ok(bool)`, the bool indicates if the username is taken,
+    /// true for user created, false for username taken
+    pub fn create_user(&self, handle: String, display: String, password: String) -> Result<bool> {
+        if let None = self.user_exists(handle.clone()) {
+            let password = password.as_bytes();
+            let salt = SaltString::generate(&mut OsRng);
+
+            let phc = match self.argon2.hash_password(password, &salt) {
+                Err(e) => bail!(ArgonError::from(e)),
+                Ok(pwdh) => pwdh.to_string(),
+            };
+
+            let mut stmnt = self
+                .conn
+                .prepare_cached("INSERT INTO users (handle, display, phc) VALUES (?1, ?2, ?3)")
+                .expect("Should be a valid sql statement");
+
+            match stmnt.execute(params![handle, display, phc]) {
+                Err(_) => bail!(SQLError),
+                Ok(_) => (),
+            };
+
+            Ok(true)
+        } else {
+            return Ok(false);
+        }
+    }
+
+    /// ### Validate a user login the user's handle and password
+    ///
+    /// Returns an `anyhow::Result<bool>`
+    ///
+    /// If `Ok(bool)`, the bool indicates if the login is valid,
+    /// true for valid, false for invalid
+    pub fn validate_user(&self, handle: String, password: String) -> Result<bool> {
+        match self.user_exists(handle) {
+            None => Ok(false),
+            Some(phc) => {
+                let password = password.as_bytes();
+                let hash = match PasswordHash::new(&phc) {
+                    Err(e) => bail!(ArgonError::from(e)),
+                    Ok(pwdh) => pwdh,
+                };
+                Ok(self.argon2.verify_password(&password, &hash).is_ok())
+            }
+        }
+    }
+
+    /// ### Update a user's password, requiring the previous password
+    pub fn update_password(&self) {}
+}
+
+#[derive(Debug)]
+pub enum ArgonError {
+    HashError(password_hash::Error),
+    EncodingError(password_hash::Error),
+    UnknownError(password_hash::Error),
+}
+
+impl From<password_hash::Error> for ArgonError {
+    fn from(value: password_hash::Error) -> Self {
+        match value {
+            password_hash::Error::SaltInvalid(_) => Self::HashError(value),
+            password_hash::Error::Algorithm => Self::HashError(value),
+            password_hash::Error::B64Encoding(_) => Self::EncodingError(value),
+            password_hash::Error::Crypto => Self::HashError(value),
+            password_hash::Error::Version => Self::HashError(value),
+            _ => Self::UnknownError(value),
+        }
+    }
+}
+
+impl Display for ArgonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::HashError(err) => format!("HashError: {}", err),
+                Self::EncodingError(err) => format!("EncodingError: {}", err),
+                Self::UnknownError(err) => format!("UnknownError: {}", err),
+            }
+        )
+    }
+}
+
+impl Error for ArgonError {}
+
+#[derive(Debug)]
+pub struct SQLError;
+
+impl Display for SQLError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for SQLError {}
 
 pub struct Sessions<'a> {
     conn: &'a Connection,
 }
 
 impl<'a> Sessions<'a> {
+    fn check_expiry(&self, cookie: &str) {
+        let mut stmnt = self
+            .conn
+            .prepare_cached("SELECT expiry FROM sessions WHERE cookie = ?1")
+            .expect("Should be a valid sql statement");
+
+        let time = get_timestamp();
+
+        let expiry: Vec<Result<u64, rusqlite::Error>> =
+            match stmnt.query_map(params![cookie], |row| row.get::<usize, u64>(0)) {
+                Ok(mapped) => mapped.collect(),
+                Err(_) => return,
+            };
+
+        if expiry.len() != 1 {
+            return;
+        }
+
+        let expiry = match expiry.into_iter().next() {
+            Some(res) => res.expect("Should never be err"),
+            None => return,
+        };
+
+        if time > expiry as u128 {
+            let mut stmnt = self
+                .conn
+                .prepare_cached("UPDATE sessions SET invalid = 1 WHERE cookie = ?1")
+                .expect("Should be a valid sql statement");
+
+            match stmnt.execute(params![cookie]) {
+                _ => return,
+            };
+        }
+    }
     pub fn validate_session(&self, cookie: &str) -> bool {
+        self.check_expiry(cookie);
         let mut stmnt = self
             .conn
             .prepare_cached("SELECT invalid FROM sessions WHERE cookie = ?1")
@@ -85,7 +269,143 @@ impl<'a> Sessions<'a> {
             !value
         }
     }
-    pub fn create_new_session(user: Option<User>) {}
+    pub fn create_new_session(&self, ip: SocketAddr) -> Result<String> {
+        // Convert user IP to string
+        let ip_str = ip.to_string();
+
+        // Get the current timestamp
+        let time = get_timestamp();
+
+        // sha256(IP + Timestamp)
+        let combine = format!("{ip_str}{time}");
+
+        let mut hasher = <Sha256 as Digest>::new();
+        Digest::update(&mut hasher, combine.as_bytes());
+        let digest = Digest::finalize(hasher);
+
+        // random 32 bytes of data
+        let mut rand = [0u8; 32];
+        thread_rng().fill(&mut rand);
+
+        // Digest + Random
+        let mut result = digest.to_vec();
+        result.append(&mut rand.to_vec());
+
+        // Encode as Base64
+        let encoded = general_purpose::STANDARD.encode(result);
+
+        // Enable Session in SQLite DB
+        let mut stmnt = self
+            .conn
+            .prepare_cached("INSERT INTO sessions (cookie) VALUES (?1)")
+            .expect("Should be a valid sql statement");
+
+        stmnt.execute(params![encoded])?;
+
+        Ok(encoded)
+    }
+    pub fn assign_session_user() {}
+}
+
+fn get_timestamp() -> u128 {
+    let start = SystemTime::now();
+    let since_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards, should not be possible");
+    since_epoch.as_millis()
+}
+
+pub enum DatabaseResult {
+    Bool(bool),
+    String(String),
+    ResultString(Result<String>),
+    ResultBool(Result<bool>),
+}
+
+impl From<bool> for DatabaseResult {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl From<String> for DatabaseResult {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for DatabaseResult {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Result<String>> for DatabaseResult {
+    fn from(value: Result<String>) -> Self {
+        Self::ResultString(value)
+    }
+}
+
+impl From<Result<bool>> for DatabaseResult {
+    fn from(value: Result<bool>) -> Self {
+        Self::ResultBool(value)
+    }
+}
+
+impl Display for DatabaseResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Bool(b) => b.to_string(),
+                Self::String(s) => s.to_string(),
+                Self::ResultString(r) => format!("{r:?}"),
+                Self::ResultBool(b) => format!("{b:?}"),
+            }
+        )
+    }
+}
+
+pub struct DatabaseMessage {
+    result: tokio::sync::oneshot::Sender<DatabaseResult>,
+    func: Box<dyn Fn(&Database) -> DatabaseResult + Send>,
+}
+
+impl DatabaseMessage {
+    pub fn new(
+        func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
+        tx: tokio::sync::oneshot::Sender<DatabaseResult>,
+    ) -> Self {
+        Self {
+            result: tx,
+            func: Box::new(func),
+        }
+    }
+
+    fn run(self, database: &Database) {
+        let result = (self.func)(database);
+        match self.result.send(result) {
+            Ok(_) => (),
+            Err(_) => eprint!("\x1b[1;31mFailed to return Database result to source\x1b[0m\n > "),
+        }
+    }
+
+    pub async fn send(
+        func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
+        db_tx: &Sender<DatabaseMessage>,
+    ) -> Result<DatabaseResult> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        db_tx
+            .send(Self {
+                result: tx,
+                func: Box::new(func),
+            })
+            .await
+            .expect("db_tx mspc channel closed: this channel should never close");
+
+        Ok(rx.await?)
+    }
 }
 
 fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
@@ -107,8 +427,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
         id INTEGER PRIMARY KEY,
         handle TEXT NOT NULL UNIQUE,
         display TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        digest TEXT NOT NULL
+        phc TEXT NOT NULL
    );",
         [],
     )?;
@@ -130,7 +449,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             cookie TEXT NOT NULL UNIQUE,
             user INTEGER,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 14400000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
        );",
@@ -142,7 +461,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             token TEXT NOT NULL UNIQUE,
             session INTEGER NOT NULL,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 14400000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_session FOREIGN KEY (session) REFERENCES sessions(id)
        );",
@@ -164,8 +483,7 @@ fn get_tables() -> Vec<TableInfo> {
             ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
             ColumnInfo::default().name("handle").not_null(true),
             ColumnInfo::default().name("display").not_null(true),
-            ColumnInfo::default().name("salt").not_null(true),
-            ColumnInfo::default().name("digest").not_null(true),
+            ColumnInfo::default().name("phc").not_null(true),
         ],
     });
 
@@ -189,7 +507,9 @@ fn get_tables() -> Vec<TableInfo> {
                 .name("expiry")
                 .kind("INTEGER")
                 .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
+                .default_value(Some(
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 14400000".to_owned(),
+                )),
             ColumnInfo::default()
                 .name("invalid")
                 .kind("INTEGER")
@@ -208,7 +528,9 @@ fn get_tables() -> Vec<TableInfo> {
                 .name("expiry")
                 .kind("INTEGER")
                 .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
+                .default_value(Some(
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 14400000".to_owned(),
+                )),
             ColumnInfo::default()
                 .name("invalid")
                 .kind("INTEGER")

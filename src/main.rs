@@ -6,19 +6,29 @@ use tokio::sync::mpsc;
 async fn main() {
     eprint!("\x1b[2J");
 
-    let db = database::init();
+    // Create and start database thread
+    let (database, db_tx) = database::init();
+    tokio::task::spawn(database);
 
-    let (tx, rx) = mpsc::channel(1);
+    // Create mpsc for WebSockets
+    let (ws_tx, ws_rx) = mpsc::channel(1);
 
+    // Create and start user registry thread
     let user_registry = Registry::new();
-    tokio::task::spawn(user_registry.start(rx));
+    tokio::task::spawn(user_registry.start(ws_rx));
 
-    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), tx));
-    // let routes = routes::ws_make(routes::static_make(), tx);
+    // Create routes
+    let routes = routes::attach_404(routes::ws_make(
+        routes::post_make(routes::page_make(routes::static_make(), &db_tx), &db_tx),
+        ws_tx,
+    ));
 
+    // Read Args
     let mut args = env::args();
+    // Ignore first arg (represents name of program)
     args.next();
 
+    // Create config, and start server using config and routes
     let config = ServerConfig::build(args).unwrap_or(ServerConfig::new([127, 0, 0, 1], 3000, None));
     match config.tls {
         Some(_) => {
@@ -31,5 +41,6 @@ async fn main() {
         }
     }
 
+    // Start console interface, consuming config
     server::console::start(config);
 }
