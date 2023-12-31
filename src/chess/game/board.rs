@@ -12,7 +12,7 @@ impl Board {
     pub fn new(fen: String, height: u8, width: u8) -> Self {
         // create starting formation here (10x12 board)
         let mut tile_arr = Vec::new();
-        for i in 0..width * 2 + 3 {
+        for i in 0..width * 2 + 5 {
             tile_arr.push(tile::Tile::Wall)
         }
 
@@ -35,6 +35,10 @@ impl Board {
             }
         }
 
+        for i in 0..width * 2 + 5 {
+            tile_arr.push(tile::Tile::Wall)
+        }
+
         Board {
             tiles: tile_arr,
             height: height,
@@ -45,7 +49,7 @@ impl Board {
     }
 
     pub fn new_default() -> Self {
-        let fen = String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR/"); // slightly modified fen string used to have dynamic starting positions for custom boards
+        let fen = String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"); // slightly modified fen string used to have dynamic starting positions for custom boards
         Board::new(fen, 8, 8)
     }
 
