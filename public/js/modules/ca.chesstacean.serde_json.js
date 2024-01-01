@@ -120,7 +120,109 @@ class SerdeError extends Error {
   }
 }
 
-function serialize() {}
+class Test {
+  serialize() {
+    return [
+      new Token("Thing1", [new Token("Thing2", null), new Token("Thing3", "content")]),
+      new Token("Thing4", null),
+      new Token("Thing5", "more content"),
+    ];
+  }
+}
+
+/**
+ * ### Serializes an object
+ *
+ * Returns a `Result<string, SerdeError>`
+ *
+ * @param {Object} obj
+ * @param {() => Result<Token[], Error>} obj.serialize
+ * @returns {Result<string, SerdeError>}
+ */
+function serialize(obj) {
+  try {
+    if (typeof obj["serialize"] !== "function") throw new Error();
+  } catch (error) {
+    return Err(new SerdeError("obj must implement serialize"));
+  }
+  const tokens = obj.serialize();
+  if (!validate_tokens(tokens))
+    return Err(new SerdeError("serialized result must be a valid Token tree"));
+
+  return Ok(detokenize(tokens));
+}
+
+/**
+ * ### Detokenizes a valid token tree
+ *
+ * Returns a `string`
+ *
+ * @param {Token[]} tokens
+ * @returns {string}
+ */
+function detokenize(tokens) {
+  const parts = [];
+
+  for (const token of tokens) {
+    switch (token.kind) {
+      case Token.Value: {
+        const [content] = token;
+        parts.push(`"${token.name}":"${content}"`);
+        break;
+      }
+      case Token.Object: {
+        const [content] = token;
+        const detokenized = detokenize(content);
+        parts.push(`"${token.name}":${detokenized}`);
+        break;
+      }
+      case Token.Null: {
+        parts.push(`"${token.name}":null`);
+        break;
+      }
+    }
+  }
+
+  return `{${parts.join(",")}}`;
+}
+
+/**
+ * ### Validates a token tree
+ *
+ * Returns a boolean, indicating whether it is valid or not
+ *
+ * @param {Token[]} tokens
+ * @returns {boolean}
+ */
+function validate_tokens(tokens) {
+  if (!(tokens instanceof Array)) return false;
+  for (const token of tokens) {
+    if (!(token instanceof Token)) return false;
+    switch (token.kind) {
+      case Token.Value: {
+        const [content] = token;
+        if (typeof content !== "string") return false;
+        break;
+      }
+      case Token.Object: {
+        const [content] = token;
+        const valid = validate_tokens(content);
+        if (!valid) return false;
+        break;
+      }
+      case Token.Null: {
+        const [content] = token;
+        if (content !== null) return false;
+        break;
+      }
+      default:
+        return false;
+    }
+
+    if (typeof token.name !== "string") return false;
+  }
+  return true;
+}
 
 /**
  * ### Deserializes a JSON string
@@ -146,22 +248,6 @@ function deserialize(json) {
   const message = Message.from(match.unwrap());
 
   return Ok(message);
-}
-
-/**
- * @param {Token} token
- */
-function count_tokens(token) {
-  if (token.kind == Token.Object) {
-    /** @type {Token[][]} */
-    const [content] = token;
-    let count = 1;
-    for (const tok of content) {
-      count += count_tokens(tok);
-    }
-    return count;
-  }
-  return 2;
 }
 
 /**
@@ -196,7 +282,7 @@ function tokenize(json) {
       // Parse value
       const value_result = tokenize_quotes(json);
       if (value_result.is_err()) return value_result;
-      const [value] = value_result;
+      const value = value_result.unwrap();
 
       // Add Token to list
       tokens.push(new Token(key, value));
@@ -257,5 +343,23 @@ function tokenize_quotes(json) {
 }
 
 window.deserialize = deserialize;
+window.serialize = serialize;
+window.Test = Test;
 
 export { serialize, deserialize };
+
+/**
+ * @param {Token} token
+ */
+function count_tokens(token) {
+  if (token.kind == Token.Object) {
+    /** @type {Token[][]} */
+    const [content] = token;
+    let count = 1;
+    for (const tok of content) {
+      count += count_tokens(tok);
+    }
+    return count;
+  }
+  return 2;
+}

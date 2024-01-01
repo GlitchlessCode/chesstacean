@@ -1,13 +1,23 @@
-use std::net::{IpAddr, SocketAddr};
-
 use http::{Response, StatusCode};
 use rand::{thread_rng, Rng};
+use serde::Deserialize;
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use warp::{filters::fs::File, reply::Reply};
 
-use self::reply::{Message, Status::Success};
+use crate::server::{
+    database::{auth::ArgonError, SQLError},
+    utils::input::{validate_display, validate_handle, validate_password},
+};
+
+use self::reply::Message;
 
 use super::{
     database::{Database, DatabaseMessage, DatabaseResult},
+    tokens::TokenManager,
+    user::{registry::Registry, UserInfo},
     *,
 };
 
@@ -38,7 +48,11 @@ pub fn static_make() -> impl Filter<Extract = (impl warp::Reply,), Error = Rejec
 pub fn ws_make(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
     ws_target: mpsc::Sender<Connection>,
+    db_tx: &mpsc::Sender<DatabaseMessage>,
+    token_man: Arc<TokenManager>,
+    user_reg: Arc<Registry>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
+    let db_tx = db_tx.clone();
     let ws_route = warp::path!("ws" / "connect")
         .and(warp::ws())
         .map(move |ws: warp::filters::ws::Ws| {
@@ -47,8 +61,13 @@ pub fn ws_make(
         });
 
     let token_route = warp::path!("ws" / "token")
-        .and(warp::header("cookie"))
-        .map(|cookie: String| Response::builder().body(cookie));
+        .and(warp::cookie::cookie("auth"))
+        .and_then(move |cookie: String| {
+            let tx = db_tx.clone();
+            let token_man = Arc::clone(&token_man);
+            let user_reg = Arc::clone(&user_reg);
+            async move { ws_token(cookie, tx, token_man, user_reg).await }
+        });
 
     ws_route.or(token_route).or(routes)
 }
@@ -96,25 +115,49 @@ pub fn page_make(
 pub fn post_make(
     routes: impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync + 'static,
     db_tx: &mpsc::Sender<DatabaseMessage>,
+    user_reg: Arc<Registry>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone + Send + Sync {
     let auth_base = warp::post().and(warp::path("auth"));
 
-    let login = warp::path("login")
-        .and(warp::filters::cookie::cookie("auth"))
-        .map(|cookie: String| {
-            serde_json::to_string(&Message::Login {
-                status: Success {
-                    context: Some("Login".to_string()),
-                },
+    let login = {
+        let db_tx = db_tx.clone();
+        let user_reg = user_reg.clone();
+        warp::path("login")
+            .and(warp::cookie::cookie("auth"))
+            .and(warp::body::json())
+            .and_then(move |cookie: String, json: Login| {
+                let db_tx = db_tx.clone();
+                let user_reg = user_reg.clone();
+                async move { log_in(cookie, json, db_tx, user_reg).await }
             })
-            .unwrap_or("Error serializing response".to_string())
-        });
+    };
 
-    let signup = warp::path("signup")
-        .and(warp::filters::cookie::cookie("auth"))
-        .map(|cookie: String| format!("Sign Up; Cookie:{}", cookie));
+    let logout = {
+        let db_tx = db_tx.clone();
+        let user_reg = user_reg.clone();
+        warp::path("logout")
+            .and(warp::cookie::cookie("auth"))
+            .and_then(move |cookie: String| {
+                let db_tx = db_tx.clone();
+                let user_reg = user_reg.clone();
+                async move { log_out(cookie, db_tx, user_reg).await }
+            })
+    };
 
-    routes.or(auth_base.and(login.or(signup)))
+    let signup = {
+        let db_tx = db_tx.clone();
+        let user_reg = user_reg.clone();
+        warp::path("signup")
+            .and(warp::cookie::cookie("auth"))
+            .and(warp::body::json())
+            .and_then(move |cookie: String, json: SignUp| {
+                let db_tx = db_tx.clone();
+                let user_reg = user_reg.clone();
+                async move { sign_up(cookie, json, db_tx, user_reg).await }
+            })
+    };
+
+    routes.or(auth_base.and(login.or(logout).or(signup)))
 }
 
 /// ### Creates the server's 404 page.
@@ -137,6 +180,273 @@ pub fn attach_404(
         });
 
     routes.or(none_found_route)
+}
+
+async fn log_in(
+    cookie: String,
+    data: Login,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+    user_reg: Arc<Registry>,
+) -> Result<impl Reply, Rejection> {
+    let user_info = match get_user_info(&cookie, &db_tx, &user_reg).await {
+        Ok(ui) => ui,
+        Err(()) => return fetching_handle_error(),
+    };
+
+    if let UserInfo::User { .. } = user_info {
+        return Ok(error_message(format!(
+            r#"{{"message":"Cannot log in while in an active session","affects":null}}"#
+        )));
+    }
+
+    let Login { handle, password } = data;
+
+    let func = {
+        let handle = handle.clone();
+        move |db: &Database| DatabaseResult::from(db.auth().validate_user(handle, password))
+    };
+
+    let result = DatabaseMessage::send(func, &db_tx).await;
+
+    let result = match result {
+        Ok(DatabaseResult::ResultBool(o)) => o,
+        _ => return Ok(server_error("Error validating user")),
+    };
+
+    match result {
+        Err(e) => {
+            if let Some(err) = e.downcast_ref::<ArgonError>() {
+                return Ok(server_error(err));
+            }
+            return Ok(server_error("Unknown Error Encountered"));
+        }
+        Ok(ok) => {
+            if !ok {
+                return Ok(error_message(format!(
+                    r#"{{"message":"ValidationError: Username or password is not valid","affects":"null"}}"#
+                )));
+            }
+        }
+    }
+
+    assign_session(cookie, handle, db_tx).await
+}
+
+async fn log_out(
+    cookie: String,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+    user_reg: Arc<Registry>,
+) -> Result<impl Reply, Rejection> {
+    let user_info = match get_user_info(&cookie, &db_tx, &user_reg).await {
+        Ok(ui) => ui,
+        Err(()) => return fetching_handle_error(),
+    };
+
+    if let UserInfo::Guest { .. } = user_info {
+        return Ok(error_message(format!(
+            r#"{{"message":"Cannot log out of guest session","affects":null}}"#
+        )));
+    }
+
+    let func = move |db: &Database| DatabaseResult::from(db.sessions().end_session(&cookie));
+
+    let result = DatabaseMessage::send(func, &db_tx).await;
+
+    let result = match result {
+        Ok(DatabaseResult::Bool(o)) => o,
+        _ => return Ok(server_error("Error ending session")),
+    };
+
+    if !result {
+        Ok(server_error(SQLError.to_string()))
+    } else {
+        Ok(Response::builder()
+            .status(303)
+            .header("Location", "/")
+            .body("".to_string())
+            .unwrap())
+    }
+}
+
+async fn sign_up(
+    cookie: String,
+    data: SignUp,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+    user_reg: Arc<Registry>,
+) -> Result<impl Reply, Rejection> {
+    let user_info = match get_user_info(&cookie, &db_tx, &user_reg).await {
+        Ok(ui) => ui,
+        Err(()) => return fetching_handle_error(),
+    };
+
+    if let UserInfo::User { .. } = user_info {
+        return Ok(error_message(format!(
+            r#"{{"message":"Cannot sign up while in an active session","affects":null}}"#
+        )));
+    }
+
+    if let Err(e) = validate_handle(&data.handle) {
+        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"handle"}}"#)));
+    }
+    if let Err(e) = validate_display(&data.display) {
+        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"display"}}"#)));
+    }
+    if let Err(e) = validate_password(&data.password) {
+        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"password"}}"#)));
+    }
+
+    let SignUp {
+        handle,
+        display,
+        password,
+    } = data;
+
+    let func = {
+        let handle = handle.clone();
+        move |db: &Database| DatabaseResult::from(db.auth().create_user(handle, display, password))
+    };
+
+    let result = DatabaseMessage::send(func, &db_tx).await;
+
+    let result = match result {
+        Ok(DatabaseResult::ResultBool(o)) => o,
+        _ => return Ok(server_error("Error creating user")),
+    };
+
+    match result {
+        Err(e) => {
+            if let Some(err) = e.downcast_ref::<ArgonError>() {
+                return Ok(server_error(err));
+            }
+            if let Some(err) = e.downcast_ref::<SQLError>() {
+                return Ok(server_error(err));
+            }
+            return Ok(server_error("Unknown Error Encountered"));
+        }
+        Ok(ok) => {
+            if !ok {
+                return Ok(error_message(format!(
+                    r#"{{"message":"UniquenessError: Handle must be unique","affects":"handle"}}"#
+                )));
+            }
+        }
+    }
+
+    assign_session(cookie, handle, db_tx).await
+}
+
+async fn assign_session(
+    cookie: String,
+    handle: String,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+) -> Result<Response<String>, Rejection> {
+    let func = move |db: &Database| DatabaseResult::from(db.sessions().assign_session_user(&cookie, handle));
+
+    let result = DatabaseMessage::send(func, &db_tx).await;
+
+    let result = match result {
+        Ok(DatabaseResult::ResultBool(o)) => o,
+        _ => return Ok(server_error("Error assigning session")),
+    };
+
+    match result {
+        Err(_) => Ok(server_error(SQLError.to_string())),
+        Ok(ok) => {
+            if ok {
+                Ok(Response::builder()
+                    .status(303)
+                    .header("Location", "/")
+                    .body("".to_string())
+                    .unwrap())
+            } else {
+                Ok(server_error("Session already has an assigned user"))
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+struct SignUp {
+    handle: String,
+    display: String,
+    password: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct Login {
+    handle: String,
+    password: String,
+}
+
+fn error_message(msg: impl ToString) -> Response<String> {
+    let ser = serde_json::to_string(&Message::Error {
+        context: msg.to_string(),
+    });
+
+    match ser {
+        Ok(msg) => Response::builder().status(400).body(msg).unwrap(),
+        Err(_) => server_error("Could not serialize error message"),
+    }
+}
+
+fn server_error(msg: impl ToString) -> Response<String> {
+    Response::builder().status(500).body(msg.to_string()).unwrap()
+}
+
+async fn ws_token(
+    cookie: String,
+    db_tx: mpsc::Sender<DatabaseMessage>,
+    token_man: Arc<TokenManager>,
+    user_reg: Arc<Registry>,
+) -> Result<impl Reply, Rejection> {
+    let user_info = match get_user_info(&cookie, &db_tx, &user_reg).await {
+        Ok(ui) => ui,
+        Err(()) => return fetching_handle_error(),
+    };
+
+    let token = token_man.create_ws_token(user_info, cookie, "connect".to_string());
+    let token = match token {
+        Ok(t) => t,
+        Err(_) => {
+            return Ok(Response::builder()
+                .status(500)
+                .body("Failed to fetch to create token".to_string())
+                .unwrap())
+        }
+    };
+
+    Ok(Response::builder().body(token).unwrap())
+}
+
+async fn get_user_info(
+    cookie: &String,
+    db_tx: &mpsc::Sender<DatabaseMessage>,
+    user_reg: &Arc<Registry>,
+) -> Result<UserInfo, ()> {
+    if let Some(info) = user_reg.get_session(&cookie).await {
+        Ok(info)
+    } else {
+        let session_id = cookie.clone();
+        let func = move |db: &Database| DatabaseResult::from(db.sessions().user_info_from_cookie(&session_id));
+        let result = DatabaseMessage::send(func, &db_tx).await;
+        let db_result = match result {
+            Err(_) => {
+                return Err(());
+            }
+            Ok(h) => h,
+        };
+        match db_result {
+            DatabaseResult::UserInfo(Some(ui)) => Ok(ui),
+            _ => return Err(()),
+        }
+    }
+}
+
+fn fetching_handle_error() -> Result<Response<String>, Rejection> {
+    Ok(Response::builder()
+        .status(500)
+        .body("Failed to fetch session info".to_string())
+        .unwrap())
 }
 
 async fn auth_cookie(
