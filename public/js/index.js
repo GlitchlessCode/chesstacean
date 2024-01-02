@@ -11,7 +11,7 @@ const ctx = cnv.getContext('2d');
 // board tracking
 
 const gridWidth  = 8;
-const gridHeight = 4;
+const gridHeight = 8;
 
 const lineThickness = 2;
 
@@ -19,11 +19,37 @@ const lineThickness = 2;
 
 /** @type {{x: number, y: number} | false} */
 let dragging = false;
-let cameraX  = 0;
-let cameraY  = 0;
+
+let zoom = 0;
+
+let cameraX = 0;
+let cameraY = 0;
 
 let maxOffsetX = 0;
 let maxOffsetY = 0;
+
+// zooming
+
+cnv.addEventListener("wheel", e => {
+	// make zooming in faster the more zoomed out you are
+	// and slower the more zoomed in you are
+	const factor = (Math.max(gridWidth, gridHeight) - zoom) / 8;
+
+	zoom -= Math.sign(e.deltaY) * factor;
+	if (zoom < 0) zoom = 0;
+
+	// -2 ensures a minimum number of tiles
+	const max = Math.max(gridWidth, gridHeight) - 2;
+
+	console.log(zoom, max);
+
+	if (zoom > max)
+		zoom = max;
+
+	requestAnimationFrame(update);
+});
+
+// dragging
 
 cnv.addEventListener("mousedown", e => {
 	const rect = cnv.getBoundingClientRect();
@@ -35,10 +61,6 @@ cnv.addEventListener("mousedown", e => {
 });
 
 cnv.addEventListener("mousemove", e => {
-	// TODO: FIX CAMERA MOVEMENT SPEED
-	// TODO: ADD CAMERA Y MANIPULATION AND ZOOM
-	// TODO: PREVENT DRAGGING BOARD OUTSIDE FRAME
-
 	if (!dragging)
 		return;
 
@@ -50,14 +72,21 @@ cnv.addEventListener("mousemove", e => {
 	cameraX = dragging.x - (e.clientX - rect.left);
 	cameraY = dragging.y - (e.clientY - rect.top );
 
-	if (Math.abs(cameraX) > maxOffsetX)
-		cameraX = maxOffsetX * Math.sign(cameraX);
-
-	if (Math.abs(cameraY) > maxOffsetY)
-		cameraY = maxOffsetY * Math.sign(cameraY);
+	// update frame
 
 	requestAnimationFrame(update);
 });
+
+// prevent dragging outside of border
+function checkCameraPosition() {
+	// cap the camera position at the max offset
+
+	if (Math.abs(cameraX) > maxOffsetX)
+		cameraX = Math.sign(cameraX) * maxOffsetX;
+
+	if (Math.abs(cameraY) > maxOffsetY)
+		cameraY = Math.sign(cameraY) * maxOffsetY;
+}
 
 // stop dragging regardless of if on canvas anymore or not
 addEventListener("mouseup", e => dragging = false);
@@ -65,11 +94,21 @@ addEventListener("mouseup", e => dragging = false);
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
 
+	const scaledGridWidth = (() => {
+		const scaledGridWidth = gridWidth - zoom;
+		return scaledGridWidth < 0 ? 0 : scaledGridWidth;
+	})();
+
+	const scaledGridHeight = (() => {
+		const scaledGridHeight = gridHeight - zoom;
+		return scaledGridHeight < 0 ? 0 : scaledGridHeight;
+	})();
+
 	// calculate the size of each tile
 
 	const tileSize = (() => {
-		const tileWidth  = cnv.width  / gridWidth;
-		const tileHeight = cnv.height / gridHeight;
+		const tileWidth  = cnv.width  / scaledGridWidth;
+		const tileHeight = cnv.height / scaledGridHeight;
 
 		return Math.min(tileWidth, tileHeight);
 	})();
@@ -84,8 +123,25 @@ function update() {
 	board.right  =  cnv.width  - board.left;
 	board.bottom =  cnv.height - board.top;
 
-	maxOffsetX = board.left;
-	maxOffsetY = board.top;
+	maxOffsetX = Math.abs(board.left);
+	maxOffsetY = Math.abs(board.top);
+
+	// prevent dragging outside of border
+
+	let prevCameraX = cameraX;
+	let prevCameraY = cameraY;
+
+	// cap the camera position at the newly calculated max offset
+	if (Math.abs(cameraX) > maxOffsetX)
+		cameraX = Math.sign(cameraX) * maxOffsetX;
+	if (Math.abs(cameraY) > maxOffsetY)
+		cameraY = Math.sign(cameraY) * maxOffsetY;
+
+	// if the cap was exceeded, restart using the new camera positions
+	if (cameraX !== prevCameraX || cameraY !== prevCameraY) {
+		requestAnimationFrame(update);
+		return;
+	}
 
 	// offset board positions by camera position
 
