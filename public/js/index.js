@@ -15,7 +15,7 @@ let firstFrame = true;
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 32
+const gridWidth  = 8
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -36,6 +36,8 @@ let maxOffsetY = 0;
 // zooming
 
 cnv.addEventListener("wheel", e => {
+	e.preventDefault();
+
 	// make zooming in faster the more zoomed out you are
 	// and slower the more zoomed in you are
 	const factor = (Math.max(gridWidth, gridHeight) - zoom) / 8;
