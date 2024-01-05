@@ -9,11 +9,13 @@ import { Coordinate } from "./components.js";
 const cnv = document.getElementById("game-board");
 const ctx = cnv.getContext('2d');
 
+let firstFrame = true;
+
 // board tracking
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 8
+const gridWidth  = 32
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -79,7 +81,7 @@ cnv.addEventListener("mousemove", e => {
 });
 
 // stop dragging regardless of if on canvas anymore or not
-addEventListener("mouseup", e => dragging = false);
+addEventListener("mouseup", () => dragging = false);
 
 function update() {
 	ctx.clearRect(0, 0, cnv.width, cnv.height);
@@ -201,6 +203,8 @@ function update() {
 
 	// draw pieces
 
+	// the pieces don't draw without this timeout until a second frame is called
+
 	(() => {
 		let row = 0;
 		let col = 0;
@@ -260,6 +264,14 @@ function update() {
 		const letteringX = board.left + tileSize * (i + 1) - labelMargin;
 
 		ctx.fillText(label, letteringX, letteringY);
+	}
+
+	// the piece images dont render on the first frame for some reason,
+	// so re-render the frame if this was the first
+
+	if (firstFrame) {
+		firstFrame = false;
+		requestAnimationFrame(update);
 	}
 }
 
