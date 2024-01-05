@@ -1,5 +1,6 @@
 "use strict";
 
+import pieces from "./pieces.js";
 import { Coordinate } from "./components.js";
 
 // canvas setup
@@ -10,7 +11,9 @@ const ctx = cnv.getContext('2d');
 
 // board tracking
 
-const gridWidth  = 16;
+const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+
+const gridWidth  = 8
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -195,6 +198,34 @@ function update() {
 		new Coordinate(board.left,  board.bottom),
 		new Coordinate(board.right, board.bottom),
 	);
+
+	// draw pieces
+
+	(() => {
+		let row = 0;
+		let col = 0;
+
+		Array.from(fen).forEach(character => {
+			if (character === '/') {
+				row++;
+				col = 0;
+
+				return;
+			}
+
+			if (Number.isInteger(+character)) {
+				col += +character;
+				return;
+			}
+
+			const x = board.left + col * tileSize;
+			const y = board.top  + row * tileSize;
+
+			ctx.drawImage(pieces[character], x, y, tileSize, tileSize);
+
+			col++;
+		});
+	})();
 
 	// draw numbering and lettering
 
