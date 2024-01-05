@@ -10,7 +10,7 @@ const ctx = cnv.getContext('2d');
 
 // board tracking
 
-const gridWidth  = 8;
+const gridWidth  = 32;
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -76,17 +76,6 @@ cnv.addEventListener("mousemove", e => {
 
 	requestAnimationFrame(update);
 });
-
-// prevent dragging outside of border
-function checkCameraPosition() {
-	// cap the camera position at the max offset
-
-	if (Math.abs(cameraX) > maxOffsetX)
-		cameraX = Math.sign(cameraX) * maxOffsetX;
-
-	if (Math.abs(cameraY) > maxOffsetY)
-		cameraY = Math.sign(cameraY) * maxOffsetY;
-}
 
 // stop dragging regardless of if on canvas anymore or not
 addEventListener("mouseup", e => dragging = false);
@@ -211,40 +200,38 @@ function update() {
 
 	// draw numbering and lettering
 
-	// const labelMargin = 5/60 * gridboxSize;
+	const labelMargin = 5/60 * tileSize;
 
-	// ctx.font      = `${12/60 * gridboxSize}px Inter, sans-serif`;
-	// ctx.fillStyle = "#DDDDDD";
+	ctx.font      = `${12/60 * tileSize}px Inter, sans-serif`;
+	ctx.fillStyle = "#DDDDDD";
 
-	// // vertical numbering
+	// vertical numbering
 
-	// ctx.textAlign = "left";
-	// ctx.textBaseline = "top";
+	ctx.textAlign    = "left";
+	ctx.textBaseline = "top";
 
-	// const numberingX = boardPosition.left + labelMargin;
+	const numberingX = board.left + labelMargin;
 
-	// for (let i = 0; i < gridHeight; i++) {
-	// 	const label      = gridHeight - i;
-	// 	const numberingY = gridboxSize * i + labelMargin;
+	for (let i = 0; i < gridHeight; i++) {
+		const label      = gridHeight - i;
+		const numberingY = board.top + tileSize * i + labelMargin;
 
-	// 	ctx.fillText(label, numberingX, numberingY);
-	// }
+		ctx.fillText(label, numberingX, numberingY);
+	}
 
-	// // horizontal numbering
+	// horizontal numbering
 
-	// ctx.textAlign = "right";
-	// ctx.textBaseline = "bottom";
+	ctx.textAlign    = "right";
+	ctx.textBaseline = "bottom";
 
-	// const letteringY = boardPosition.bottom - labelMargin;
+	const letteringY = board.bottom - labelMargin;
 
-	// for (let i = 0; i < gridWidth; i++) {
-	// 	const label = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
-	// 	const letteringX = gridboxSize * (i + 1) - labelMargin;
+	for (let i = 0; i < gridWidth; i++) {
+		const label      = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
+		const letteringX = board.left + tileSize * (i + 1) - labelMargin;
 
-	// 	ctx.fillText(label, letteringX, letteringY);
-	// }
-
-	// TODO: MAKE NUMBERING/LETTERING + LABEL MARGIN SCALE WITH TILE SIZE
+		ctx.fillText(label, letteringX, letteringY);
+	}
 }
 
 /**
