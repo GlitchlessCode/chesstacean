@@ -292,6 +292,8 @@ function drawLine(first, final) {
 cnv.addEventListener("resize", () => {
 	cnv.width  = Math.floor(cnv.getBoundingClientRect().width );
 	cnv.height = Math.floor(cnv.getBoundingClientRect().height);
+
+	requestAnimationFrame(update);
 });
 
 cnv.dispatchEvent(new Event("resize"));
