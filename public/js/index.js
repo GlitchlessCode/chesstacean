@@ -10,7 +10,7 @@ const ctx = cnv.getContext('2d');
 
 // board tracking
 
-const gridWidth  = 32;
+const gridWidth  = 16;
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -40,8 +40,6 @@ cnv.addEventListener("wheel", e => {
 
 	// -2 ensures a minimum number of tiles
 	const max = Math.max(gridWidth, gridHeight) - 2;
-
-	console.log(zoom, max);
 
 	if (zoom > max)
 		zoom = max;

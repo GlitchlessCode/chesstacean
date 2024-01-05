@@ -4,20 +4,28 @@ const nav       = document.querySelector("body > nav");
 const main      = document.querySelector("body > main");
 const gamePopup = document.getElementById("game-popup");
 
+const transitionTimeMs = 200;
+
 function openGamePopup() {
-	gamePopup.classList.add("active");
+	gamePopup.style.removeProperty("overflow-x");
+
+	gamePopup.classList.add("active")
 
 	setTimeout(() => {
 		nav.style.display  = "none";
 		main.style.display = "none";
-	}, 200); // transition time of .2s
+	}, transitionTimeMs);
 }
 
 function closeGamePopup() {
+	nav.style.removeProperty("display");
+    main.style.removeProperty("display");
+
 	gamePopup.classList.remove("active");
 
-    nav.style.removeProperty("display");
-    main.style.removeProperty("display");
+	setTimeout(() => {
+		gamePopup.style.overflowX = "hidden";
+	}, transitionTimeMs);
 }
 
 addEventListener("keydown", e => {
