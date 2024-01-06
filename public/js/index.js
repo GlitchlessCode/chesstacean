@@ -1,146 +1,284 @@
+"use strict";
 
-import "./modules/ca.chesstacean.components.js";
-import "./web-components/registry.js";
+import pieces from "./pieces.js";
+import { Coordinate } from "./components.js";
 
-const nav        = document.querySelector("body > nav");
-const main       = document.querySelector("body > main");
-
-const gameWindow = document.getElementById("game-window");
-
-window.openGameWindow = async () => {
-	gameWindow.classList.add("active");
-
-	setTimeout(() => {
-		nav.style.display = "none";
-		main.style.display = "none";
-	}, 200); // transition time of .2s
-}
-
-window.closeGameWindow = () => {
-	gameWindow.classList.remove("active");
-
-	nav.removeAttribute('style');
-	main.removeAttribute('style');
-}
+// canvas setup
 
 /** @type {HTMLCanvasElement} */
 const cnv = document.getElementById("game-board");
-const ctx = cnv.getContext('2d');
+const ctx = cnv.getContext("2d");
 
-const gridWidth  = 8;
+let firstFrame = true;
+
+// board tracking
+
+const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+
+const gridWidth = 26;
 const gridHeight = 8;
 
-const lineWidth = 2;
+const lineThickness = 2;
 
-requestAnimationFrame(update);
+// canvas movement
+
+/** @type {{x: number, y: number} | false} */
+let dragging = false;
+
+let zoom = 0;
+
+let cameraX = 0;
+let cameraY = 0;
+
+let maxOffsetX = 0;
+let maxOffsetY = 0;
+
+// zooming
+
+cnv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  // make zooming in faster the more zoomed out you are
+  // and slower the more zoomed in you are
+  const factor = (Math.max(gridWidth, gridHeight) - zoom) / 8;
+
+  zoom -= Math.sign(e.deltaY) * factor;
+  if (zoom < 0) zoom = 0;
+
+  // -2 ensures a minimum number of tiles
+  const max = Math.max(gridWidth, gridHeight) - 2;
+
+  if (zoom > max) zoom = max;
+
+  requestAnimationFrame(update);
+});
+
+// dragging
+
+cnv.addEventListener("mousedown", (e) => {
+  const rect = cnv.getBoundingClientRect();
+
+  dragging = {
+    x: e.clientX - rect.left + cameraX,
+    y: e.clientY - rect.top + cameraY,
+  };
+});
+
+cnv.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+
+  const rect = cnv.getBoundingClientRect();
+
+  cnv.setAttribute("width", rect.width);
+  cnv.setAttribute("height", rect.height);
+
+  cameraX = dragging.x - (e.clientX - rect.left);
+  cameraY = dragging.y - (e.clientY - rect.top);
+
+  // update frame
+
+  requestAnimationFrame(update);
+});
+
+// stop dragging regardless of if on canvas anymore or not
+addEventListener("mouseup", () => (dragging = false));
 
 function update() {
-	ctx.clearRect(0, 0, cnv.width, cnv.height);
+  ctx.clearRect(0, 0, cnv.width, cnv.height);
 
-	// draw tiles
+  const scaledGridWidth = (() => {
+    const scaledGridWidth = gridWidth - zoom;
+    return scaledGridWidth < 0 ? 0 : scaledGridWidth;
+  })();
 
-	const gridboxWidth = cnv.width / gridWidth;
-	const gridboxHeight = cnv.height / gridHeight;
+  const scaledGridHeight = (() => {
+    const scaledGridHeight = gridHeight - zoom;
+    return scaledGridHeight < 0 ? 0 : scaledGridHeight;
+  })();
 
-	const gridboxSize = Math.min(gridboxWidth, gridboxHeight);
+  // calculate the size of each tile
 
-	for (let i = 0; i < gridHeight; i++) {
-		for (let j = i % 2; j < gridWidth; j += 2) {
-			const x = gridboxSize * j;
-			const y = gridboxSize * i;
+  const tileSize = (() => {
+    const tileWidth = cnv.width / scaledGridWidth;
+    const tileHeight = cnv.height / scaledGridHeight;
 
-			ctx.rect(x, y, gridboxSize, gridboxSize);
-			ctx.fillStyle = "#101010";
-			ctx.fill();
-		}
-	}
+    return Math.min(tileWidth, tileHeight);
+  })();
 
-	const boardPosition = {
-		top: 0,
-		left: 0,
-		right: gridboxSize * gridWidth,
-		bottom: gridboxSize * gridHeight,
-	};
+  // calculate the board positions
+  // center the grid within the board
 
-	// draw lines
+  const board = {};
 
-	// vertical
+  board.top = (cnv.height - tileSize * gridHeight) / 2;
+  board.left = (cnv.width - tileSize * gridWidth) / 2;
+  board.right = cnv.width - board.left;
+  board.bottom = cnv.height - board.top;
 
-	for (let i = 0; i < gridWidth - 1; i++) {
-		const x = gridboxSize * (i + 1);
+  maxOffsetX = Math.abs(board.left);
+  maxOffsetY = Math.abs(board.top);
 
-		drawLine(x, 0, x, gridboxSize * gridHeight);
-	}
+  // prevent dragging outside of border
 
-	// horizontal
+  let prevCameraX = cameraX;
+  let prevCameraY = cameraY;
 
-	for (let i = 0; i < gridHeight - 1; i++) {
-		const y= gridboxSize * (i + 1);
+  // cap the camera position at the newly calculated max offset
+  if (Math.abs(cameraX) > maxOffsetX) cameraX = Math.sign(cameraX) * maxOffsetX;
+  if (Math.abs(cameraY) > maxOffsetY) cameraY = Math.sign(cameraY) * maxOffsetY;
 
-		drawLine(0, y, gridboxSize * gridWidth, y);
-	}
+  // offset board positions by camera position
 
-	// draw borders
+  board.top -= cameraY;
+  board.left -= cameraX;
+  board.right -= cameraX;
+  board.bottom -= cameraY;
 
-	drawLine(boardPosition.left, boardPosition.top, boardPosition.left, boardPosition.bottom);
-	drawLine(boardPosition.left, boardPosition.top, boardPosition.right, boardPosition.top);
-	drawLine(boardPosition.right, boardPosition.top, boardPosition.right, boardPosition.bottom);
-	drawLine(boardPosition.left, boardPosition.bottom, boardPosition.right, boardPosition.bottom);
+  // draw tiles
 
-	// draw numbering and lettering
+  ctx.fillStyle = "#101010";
 
-	const labelMargin = 8;
+  for (let col = 0; col < gridHeight; col++)
+    // col % 2 is used to checker the board by switching the starting position
+    for (let row = col % 2; row < gridWidth; row += 2) {
+      const x = board.left + tileSize * row;
+      const y = board.top + tileSize * col;
 
-	ctx.font      = "12px Inter";
-	ctx.fillStyle = "#DDDDDD";
+      ctx.rect(x, y, tileSize, tileSize);
+    }
 
-	// vertical numbering
+  ctx.fill();
 
-	ctx.textAlign = "left";
-	ctx.textBaseline = "top";
+  // draw vertical lines
 
-	const numberingX = boardPosition.left + labelMargin - lineWidth;
+  for (let i = 1; i < gridWidth; i++) {
+    const x = board.left + tileSize * i;
 
-	for (let i = 0; i < gridHeight; i++) {
-		const label      = gridHeight - i;
-		const numberingY = gridboxSize * i + labelMargin - lineWidth;
+    drawLine(new Coordinate(x, board.top), new Coordinate(x, board.bottom));
+  }
 
-		ctx.fillText(label, numberingX, numberingY);
-	}
+  // draw horizontal lines
 
-	// horizontal numbering
+  for (let i = 1; i < gridHeight; i++) {
+    const y = board.top + tileSize * i;
 
-	ctx.textAlign = "right";
-	ctx.textBaseline = "bottom";
+    drawLine(new Coordinate(board.left, y), new Coordinate(board.right, y));
+  }
 
-	const letteringY = boardPosition.bottom - labelMargin + lineWidth;
+  // draw borders
 
-	for (let i = 0; i < gridWidth; i++) {
-		const label = i + 1;
-		const letteringX = gridboxSize * (i + 1) - labelMargin + lineWidth;
+  drawLine(
+    new Coordinate(board.left, board.top),
+    new Coordinate(board.left, board.bottom)
+  );
 
-		ctx.fillText(label, letteringX, letteringY);
-	}
+  drawLine(new Coordinate(board.left, board.top), new Coordinate(board.right, board.top));
 
-	// TODO: ADD ZOOM TO CHESSBOARD
-	// TODO: ADD LETTERING HORIZONTAL SUPPORT FOR GRIDWIDTHS 26 AND UNDER
-	// TODO: MAKE NUMBERING/LETTERING + LABEL MARGIN SCALE WITH TILE SIZE
+  drawLine(
+    new Coordinate(board.right, board.top),
+    new Coordinate(board.right, board.bottom)
+  );
+
+  drawLine(
+    new Coordinate(board.left, board.bottom),
+    new Coordinate(board.right, board.bottom)
+  );
+
+  // draw pieces
+
+  // the pieces don't draw without this timeout until a second frame is called
+
+  (() => {
+    let row = 0;
+    let col = 0;
+
+    Array.from(fen).forEach((character) => {
+      if (character === "/") {
+        row++;
+        col = 0;
+
+        return;
+      }
+
+      if (Number.isInteger(+character)) {
+        col += +character;
+        return;
+      }
+
+      const x = board.left + col * tileSize;
+      const y = board.top + row * tileSize;
+
+      ctx.drawImage(pieces[character], x, y, tileSize, tileSize);
+
+      col++;
+    });
+  })();
+
+  // draw numbering and lettering
+
+  const labelMargin = (5 / 60) * tileSize;
+
+  ctx.font = `${(12 / 60) * tileSize}px Inter, sans-serif`;
+  ctx.fillStyle = "#DDDDDD";
+
+  // vertical numbering
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+
+  const numberingX = board.left + labelMargin;
+
+  for (let i = 0; i < gridHeight; i++) {
+    const label = gridHeight - i;
+    const numberingY = board.top + tileSize * i + labelMargin;
+
+    ctx.fillText(label, numberingX, numberingY);
+  }
+
+  // horizontal numbering
+
+  ctx.textAlign = "right";
+  ctx.textBaseline = "bottom";
+
+  const letteringY = board.bottom - labelMargin;
+
+  for (let i = 0; i < gridWidth; i++) {
+    const label = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
+    const letteringX = board.left + tileSize * (i + 1) - labelMargin;
+
+    ctx.fillText(label, letteringX, letteringY);
+  }
+
+  // the piece images dont render on the first frame for some reason,
+  // so re-render the frame if this was the first
+
+  if (firstFrame) {
+    firstFrame = false;
+    requestAnimationFrame(update);
+  }
 }
 
-function drawLine(x1, y1, x2, y2) {
-	ctx.beginPath();
-	ctx.moveTo(x1, y1);
-	ctx.lineTo(x2, y2);
+/**
+ * @param {Coordinate} first
+ * @param {Coordinate} final
+ */
+function drawLine(first, final) {
+  ctx.beginPath();
+  ctx.moveTo(first.x, first.y);
+  ctx.lineTo(final.x, final.y);
 
-	ctx.strokeStyle = "#666666";
-	ctx.lineWidth   = lineWidth;
-	ctx.stroke();
-};
+  ctx.strokeStyle = "#666666";
+  ctx.lineWidth = lineThickness;
+  ctx.stroke();
+}
 
 cnv.addEventListener("resize", () => {
-	cnv.width  = Math.floor(cnv.getBoundingClientRect().width );
-	cnv.height = Math.floor(cnv.getBoundingClientRect().height);
+  cnv.width = Math.floor(cnv.getBoundingClientRect().width);
+  cnv.height = Math.floor(cnv.getBoundingClientRect().height);
+
+  requestAnimationFrame(update);
 });
 
 cnv.dispatchEvent(new Event("resize"));
 
+requestAnimationFrame(update);

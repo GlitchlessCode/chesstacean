@@ -1,26 +1,42 @@
-use chesstacean::server::{self, database, routes, user::registry::Registry, ServerConfig};
-use std::env;
+use chesstacean::{
+    server::{self, database, routes, tokens::TokenManager, user::registry::Registry, ServerConfig},
+    word_loader,
+};
+use std::{env, sync::Arc};
 use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
     eprint!("\x1b[2J");
 
-    // Create and start database thread
-    let (database, db_tx) = database::init();
-    tokio::task::spawn(database);
+    let words = word_loader::load().await;
+
+    // Create TokenManager
+    let token_manager = Arc::new(TokenManager::new());
 
     // Create mpsc for WebSockets
-    let (ws_tx, ws_rx) = mpsc::channel(1);
+    let (ws_tx, ws_rx) = mpsc::channel(10);
 
     // Create and start user registry thread
     let user_registry = Registry::new();
-    tokio::task::spawn(user_registry.start(ws_rx));
+    tokio::task::spawn(Registry::start(user_registry.clone(), ws_rx, token_manager.clone()));
+
+    // Create and start database thread, and session flusher
+    let (database, db_tx, flusher) = database::init(user_registry.clone());
+    tokio::task::spawn(database);
+    tokio::task::spawn(flusher);
 
     // Create routes
     let routes = routes::attach_404(routes::ws_make(
-        routes::post_make(routes::page_make(routes::static_make(), &db_tx), &db_tx),
+        routes::post_make(
+            routes::page_make(routes::static_make(), &db_tx),
+            &db_tx,
+            user_registry.clone(),
+        ),
         ws_tx,
+        &db_tx,
+        token_manager.clone(),
+        user_registry,
     ));
 
     // Read Args

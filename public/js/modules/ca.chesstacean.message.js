@@ -25,7 +25,7 @@ class Types {
 
   static verify = {
     [this.String]: function (maybe_str) {
-      if (typeof maybe_str == "string") return Ok(maybe_str);
+      if (typeof maybe_str == "string") return Ok(maybe_str.replace('\\"', '"'));
       return Err(new TypeError("Captured value is not of type string"));
     },
     [this.Number]: function (maybe_num) {
@@ -390,8 +390,8 @@ const status = define("status").with(
     .xor(define("Partial").with(context))
 );
 
-const login = define("Login").with(status);
-const signup = define("SignUp").with(status);
+const error = define("Error").with(context);
+const connected = define("Connected").with(define("display").capture(Types.String));
 
 class Status {
   static Success = Symbol("Success");
@@ -438,24 +438,30 @@ class Status {
 }
 
 class Message {
-  static DEFINITIONS = login.xor(signup);
+  static DEFINITIONS = error.xor(connected);
 
-  static Login = Symbol("Login");
-  static SignUp = Symbol("SignUp");
+  static Error = Symbol("Error");
+  static Connected = Symbol("Connected");
 
   /**
-   * @param {Object<string, any>} match
+   * @typedef {{Error:{context:string}}} ErrorMsg
+   */
+  /**
+   * @typedef {{Connected:{display:string}}} ConnectedMsg
+   */
+  /**
+   * @param {ErrorMsg|ConnectedMsg} match
    */
   static from(match) {
     switch (Object.keys(match)[0]) {
-      case "Login": {
-        const self = new this(this.Login);
-        self.status = Status.from(match.Login.status);
+      case "Error": {
+        const self = new this(this.Error);
+        self.body.context = match.Error.context;
         return self;
       }
-      case "SignUp": {
-        const self = new this(this.SignUp);
-        self.status = Status.from(match.SignUp.status);
+      case "Connected": {
+        const self = new this(this.Connected);
+        self.body.display = match.Connected.display;
         return self;
       }
     }
@@ -466,11 +472,14 @@ class Message {
   }
 
   #kind;
+  /** @type {Object<string, any>} */
+  body;
   /**
    * @param {symbol} kind
    */
   constructor(kind) {
     this.#kind = kind;
+    this.body = {};
   }
 }
 

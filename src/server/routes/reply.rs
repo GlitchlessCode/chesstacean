@@ -17,6 +17,5 @@ impl From<anyhow::Error> for Status {
 
 #[derive(Serialize)]
 pub enum Message {
-    SignUp { status: Status },
-    Login { status: Status },
+    Error { context: String },
 }
