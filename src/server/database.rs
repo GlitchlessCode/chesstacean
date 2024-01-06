@@ -281,6 +281,7 @@ fn attempt_create(database: &Connection) -> Result<()> {
     database.execute(
         "CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
         black INTEGER NOT NULL,
         white INTEGER NOT NULL,
         moves TEXT,
@@ -325,6 +326,7 @@ fn get_tables() -> Vec<TableInfo> {
         name: "games".to_owned(),
         columns: vec![
             ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("name").kind("TEXT").not_null(true),
             ColumnInfo::default().name("black").kind("INTEGER").not_null(true),
             ColumnInfo::default().name("white").kind("INTEGER").not_null(true),
             ColumnInfo::default().name("moves"),

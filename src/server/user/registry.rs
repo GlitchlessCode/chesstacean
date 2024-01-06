@@ -1,5 +1,5 @@
 use super::*;
-use crate::server::{tokens::TokenManager, ws::ChessMessage};
+use crate::server::{tokens::TokenManager, ws::SentMessage};
 use futures_util::StreamExt;
 use std::{
     collections::{HashMap, HashSet},
@@ -74,7 +74,7 @@ impl Registry {
 
                 if let Ok(parse) = parse {
                     if !parse.valid() {
-                        conn.send(ChessMessage::error("Token expired")).await;
+                        conn.send(SentMessage::error("Token expired")).await;
                         return;
                     }
 
@@ -88,29 +88,23 @@ impl Registry {
                         None => format!("&{}", parse.us.get_display()),
                     };
 
-                    // ! TEMPORARY [START]
-                    let TEMPORARY = key.clone();
-
                     if let Some(user_conn) = user_writer.get(&key) {
-                        conn.send(ChessMessage::error(format!(
-                            "TEMPORARY: Connected as user with name {}",
-                            TEMPORARY
-                        )))
+                        conn.send(SentMessage::Connected {
+                            display: parse.us.get_display(),
+                        })
                         .await;
                         user_conn.add_connection(conn, parse.sub).await;
                     } else {
-                        conn.send(ChessMessage::error(format!(
-                            "TEMPORARY: Connected as guest with name {}",
-                            TEMPORARY
-                        )))
+                        conn.send(SentMessage::Connected {
+                            display: parse.us.get_display(),
+                        })
                         .await;
                         let user_conn = UserConnection::from(parse.us);
                         user_conn.add_connection(conn, parse.sub).await;
                         user_writer.insert(key, user_conn);
                     }
-                    // ! TEMPORARY [END]
                 } else {
-                    conn.send(ChessMessage::error("Unauthorized to connect")).await;
+                    conn.send(SentMessage::error("Unauthorized to connect")).await;
                 }
             }
         } else {

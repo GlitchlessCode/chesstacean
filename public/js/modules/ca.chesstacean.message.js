@@ -391,6 +391,7 @@ const status = define("status").with(
 );
 
 const error = define("Error").with(context);
+const connected = define("Connected").with(define("display").capture(Types.String));
 
 class Status {
   static Success = Symbol("Success");
@@ -437,17 +438,30 @@ class Status {
 }
 
 class Message {
-  static DEFINITIONS = error;
+  static DEFINITIONS = error.xor(connected);
 
   static Error = Symbol("Error");
+  static Connected = Symbol("Connected");
+
   /**
-   * @param {Object<string, any>} match
+   * @typedef {{Error:{context:string}}} ErrorMsg
+   */
+  /**
+   * @typedef {{Connected:{display:string}}} ConnectedMsg
+   */
+  /**
+   * @param {ErrorMsg|ConnectedMsg} match
    */
   static from(match) {
     switch (Object.keys(match)[0]) {
       case "Error": {
         const self = new this(this.Error);
         self.body.context = match.Error.context;
+        return self;
+      }
+      case "Connected": {
+        const self = new this(this.Connected);
+        self.body.display = match.Connected.display;
         return self;
       }
     }

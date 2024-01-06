@@ -4,6 +4,7 @@ use super::{
 };
 use crate::server::ws::Connection;
 use anyhow::Result;
+use interface::GameInterface;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -17,6 +18,7 @@ use tokio::{
     task::JoinSet,
 };
 
+pub mod interface;
 pub mod registry;
 
 pub struct UserConnection {
@@ -57,6 +59,7 @@ impl UserConnection {
         let mut writer = self.connections.write().await;
         if let Some(conn) = writer.remove(session) {
             conn.close().await;
+            self.listener.interrupt().await.unwrap();
             true
         } else {
             false
@@ -86,7 +89,8 @@ impl From<UserInfo> for UserConnection {
 
 struct ConnectionListener {
     connections: ArcLock<HashMap<String, SessionConnections>>,
-    targets: RwLock<HashMap<String, ()>>,
+    targets: RwLock<HashMap<String, GameInterface>>,
+    // controller:
     interrupt: mpsc::Sender<()>,
 }
 
@@ -114,6 +118,7 @@ impl ConnectionListener {
             if let ListenerResult::Result(r) = result {
                 match r {
                     ws::ListenerResult::Disconnected(id) => {
+                        eprint!("\rUser {} has disconnected\n > ", id);
                         let mut hash_map = self.connections.write().await;
                         'inner: for (_, session) in (*hash_map).iter_mut() {
                             if session.close_connection(id).await {
@@ -128,6 +133,7 @@ impl ConnectionListener {
                     ws::ListenerResult::Message(msg) => {
                         eprint!("\rNew Message: {msg:?}\n > ");
                     }
+                    ws::ListenerResult::Ignore => (),
                 }
             }
 

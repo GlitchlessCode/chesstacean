@@ -1,3 +1,3 @@
 pub struct Player {
-    to_move: bool,
+    pub to_move: bool,
 }

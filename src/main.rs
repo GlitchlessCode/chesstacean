@@ -1,10 +1,15 @@
-use chesstacean::server::{self, database, routes, tokens::TokenManager, user::registry::Registry, ServerConfig};
+use chesstacean::{
+    server::{self, database, routes, tokens::TokenManager, user::registry::Registry, ServerConfig},
+    word_loader,
+};
 use std::{env, sync::Arc};
 use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
     eprint!("\x1b[2J");
+
+    let words = word_loader::load().await;
 
     // Create TokenManager
     let token_manager = Arc::new(TokenManager::new());

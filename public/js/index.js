@@ -1,7 +1,8 @@
 import "./modules/ca.chesstacean.components.js";
 import "./web-components/registry.js";
 
-import "./modules/ca.chesstacean.serde_json.js";
+import { ConnectionManager } from "./modules/ca.chesstacean.network.js";
+window.ConnectionManager = ConnectionManager;
 
 const nav = document.querySelector("body > nav");
 const main = document.querySelector("body > main");

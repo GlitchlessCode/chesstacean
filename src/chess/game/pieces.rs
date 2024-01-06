@@ -1,6 +1,8 @@
 use std::rc::Weak;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 pub enum Piece {
     King { color: TeamColor, position: Position },
     Queen { color: TeamColor, position: Position },
@@ -139,7 +141,28 @@ pub enum TeamColor {
     Black,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Position {
     pub x: u8,
     pub y: u8,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Move {
+    pub source: Position,
+    pub target: Position,
+    // More
+}
+
+impl From<Move> for ValidMove {
+    fn from(value: Move) -> Self {
+        let Move { source, target } = value;
+        Self { source, target }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidMove {
+    source: Position,
+    target: Position,
 }

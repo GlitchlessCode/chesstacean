@@ -1,4 +1,4 @@
-import { Message } from "./ca.chesstacean.reply.js";
+import { Message } from "./ca.chesstacean.message.js";
 import { Result, Ok, Err } from "./ca.chesstacean.result.js";
 
 export class Token {
@@ -120,16 +120,6 @@ class SerdeError extends Error {
   }
 }
 
-class Test {
-  serialize() {
-    return [
-      new Token("Thing1", [new Token("Thing2", null), new Token("Thing3", "content")]),
-      new Token("Thing4", null),
-      new Token("Thing5", "more content"),
-    ];
-  }
-}
-
 /**
  * ### Serializes an object
  *
@@ -146,8 +136,11 @@ function serialize(obj) {
     return Err(new SerdeError("obj must implement serialize"));
   }
   const tokens = obj.serialize();
-  if (!validate_tokens(tokens))
-    return Err(new SerdeError("serialized result must be a valid Token tree"));
+  if (!(tokens instanceof Result) || tokens.is_err())
+    return Err(new SerdeError("Serialization Error"));
+
+  if (!validate_tokens(tokens.unwrap()))
+    return Err(new SerdeError("Serialized result must be a valid Token tree"));
 
   return Ok(detokenize(tokens));
 }
@@ -342,24 +335,20 @@ function tokenize_quotes(json) {
   return Ok(str);
 }
 
-window.deserialize = deserialize;
-window.serialize = serialize;
-window.Test = Test;
-
 export { serialize, deserialize };
 
-/**
- * @param {Token} token
- */
-function count_tokens(token) {
-  if (token.kind == Token.Object) {
-    /** @type {Token[][]} */
-    const [content] = token;
-    let count = 1;
-    for (const tok of content) {
-      count += count_tokens(tok);
-    }
-    return count;
-  }
-  return 2;
-}
+// /**
+//  * @param {Token} token
+//  */
+// function count_tokens(token) {
+//   if (token.kind == Token.Object) {
+//     /** @type {Token[][]} */
+//     const [content] = token;
+//     let count = 1;
+//     for (const tok of content) {
+//       count += count_tokens(tok);
+//     }
+//     return count;
+//   }
+//   return 2;
+// }

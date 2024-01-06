@@ -3,12 +3,17 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::{atomic::AtomicU64, Arc};
 use tokio::sync::{oneshot::Sender, RwLock};
 use warp::{
     filters::ws::{Message, WebSocket},
     Error,
+};
+
+use crate::chess::game::{
+    network::{Action, ApprovedChatMessage, ChatMessage},
+    pieces::Move,
 };
 
 static ID: AtomicU64 = AtomicU64::new(0);
@@ -48,7 +53,13 @@ impl Connection {
         match msg {
             None => ListenerResult::Disconnected(self.id),
             Some(Err(e)) => ListenerResult::Error(e),
-            Some(Ok(m)) => ListenerResult::Message(m),
+            Some(Ok(m)) => {
+                if m.is_text() {
+                    ListenerResult::Message(m)
+                } else {
+                    ListenerResult::Ignore
+                }
+            }
         }
     }
 
@@ -72,17 +83,38 @@ pub enum ListenerResult {
     Message(Message),
     Error(Error),
     Disconnected(u64),
+    Ignore,
 }
 
 #[derive(Serialize)]
-pub enum ChessMessage {
+pub enum SentMessage {
     Error { context: String },
+    Connected { display: String },
+    GameEvent { event: GameEvent },
 }
 
-impl ChessMessage {
+impl SentMessage {
     pub fn error(context: impl ToString) -> Self {
         Self::Error {
             context: context.to_string(),
         }
     }
+}
+
+#[derive(Serialize)]
+pub enum GameEvent {
+    Message { msg: ApprovedChatMessage },
+}
+
+#[derive(Deserialize)]
+pub enum RecievedMessage {
+    Join,
+    GameAction { action: GameAction },
+}
+
+#[derive(Deserialize)]
+pub enum GameAction {
+    Message { msg: ChatMessage },
+    Turn { turn: Move },
+    Action { action: Action },
 }

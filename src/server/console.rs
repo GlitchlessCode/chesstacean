@@ -4,6 +4,10 @@ use command::Command;
 use console::Console;
 use std::{cell::RefCell, fmt::Display, io, slice::Iter, str::FromStr, vec};
 
+pub fn success_msg(msg: impl Display) {
+    eprintln!("\x1b[92;1m{msg}\x1b[0m")
+}
+
 pub fn start(config: ServerConfig) {
     Console::new(config).start();
 }
