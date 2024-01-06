@@ -15,7 +15,7 @@ let firstFrame = true;
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 26
+const gridWidth  = 8;
 const gridHeight = 8;
 
 const lineThickness = 2;

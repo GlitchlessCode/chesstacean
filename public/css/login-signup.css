@@ -30,6 +30,7 @@ body > main > img {
 	width: 32px;
 	aspect-ratio: 1/1;
 	margin: 64px;
+	cursor: pointer;
 }
 
 body > main > h1 {

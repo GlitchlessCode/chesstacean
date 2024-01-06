@@ -47,11 +47,12 @@
 			</div>
 		</nav>
 
-		<main>
+		<main class=""> <!-- class="loggedin" for logged in styles -->
 			<div class="topleft">
 				<div class="head">
 					<div class="left">
-						<h1 class="welcome">Welcome back, Jaiden.</h1>
+						<h1 class="guest"><a href="/login">Sign in</a> or continue as guest.</h1>
+						<h1 class="account">Welcome back, [displayname].</h1>
 						<div>
 							<button><div>create game</div></button>
 							<button><div>join game</div></button>
@@ -68,7 +69,7 @@
 							<img alt="bishop icon" src="/img/bishop-icon.png" />
 						</div>
 						<div class="info-container">
-							<span>jaiden appiah vs timothy veugelers</span> — active game. Your turn.
+							<span>[displayname1] vs [displayname2]</span> — active game. Your turn.
 						</div>
 						<button onclick="openGamePopup()"><div>play</div></button>
 						<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -82,7 +83,7 @@
 							<img alt="bishop icon" src="/img/bishop-icon.png" />
 						</div>
 						<div class="info-container">
-							<span>jaiden appiah vs timothy veugelers</span> — inactive game.
+							<span>[displayname1] vs [displayname2]</span> — inactive game.
 						</div>
 						<button onclick="openGamePopup()"><div>review</div></button>
 						<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -128,12 +129,12 @@
 
 			<div class="left">
 				<player-card time="225/300">
-					<div slot="display">timothy veugelers</div>
-					<div slot="handle">@glitchlesscode</div>
+					<div slot="display">[displayname2]</div>
+					<div slot="handle">@[handle2]</div>
 				</player-card>
 				<player-card time="225/300" class="active">
-					<div slot="display">jaiden appiah</div>
-					<div slot="handle">@somnxd</div>
+					<div slot="display">[displayname1]</div>
+					<div slot="handle">@[handle1]</div>
 				</player-card>
 			</div>
 

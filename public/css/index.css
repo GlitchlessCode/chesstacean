@@ -116,6 +116,18 @@ main > div.topleft > div.head > div.left > h1 {
 	color: var(--color-foreground);
 }
 
+main > div.topleft > div.head > div.left > h1.guest > a {
+	color: var(--color-accent);
+}
+
+main:not(.loggedin) h1.account {
+	display: none;
+}
+
+main.loggedin h1.guest {
+	display: none;
+}
+
 main > div.topleft > div.head > div.left > div {
 	gap: 8px;
 	display: flex;
