@@ -1,0 +1,99 @@
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap");
+
+html {
+	background-color: var(--color-background);
+}
+
+body {
+	--content-width: 75%;
+	--content-height: 64px;
+
+	border-top-left-radius: 32px;
+	border-bottom-left-radius: 32px;
+	margin: 0;
+	position: absolute;
+	width: 480px;
+	height: 100%;
+	right: 0;
+	background-color: var(--color-midbackground);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+body > img {
+	width: 32px;
+	aspect-ratio: 1/1;
+	margin: 64px;
+}
+
+body > h1 {
+	color: var(--color-foreground);
+	font-size: 2rem;
+	font-weight: bold;
+	font-family: var(--font-family);
+	margin-bottom: 64px;
+	margin-top: 0;
+}
+
+body > input {
+	width: var(--content-width);
+	height: var(--content-height);
+	box-sizing: border-box;
+	outline-style: none;
+	border-style: none;
+	border-bottom: solid var(--color-midforeground) 4px;
+	font-family: var(--font-family);
+	font-size: 1.125rem;
+	background-color: transparent;
+	margin-bottom: 32px;
+
+	transition-duration: .2s;
+	transition-property: all;
+}
+
+body > input:focus {
+	border-bottom-color: var(--color-accent);
+	color: var(--color-accent);
+}
+
+body > input::-ms-reveal {
+	filter: invert(100%);
+}
+
+body > button {
+	width: var(--content-width);
+	height: var(--content-height);
+	border-radius: 16px;
+	color: var(--color-midforeground);
+	font-size: 1.25rem;
+	font-weight: 600;
+	background-color: var(--color-background);
+	border-style: none;
+	cursor: pointer;
+
+	transition-duration: .2s;
+	transition-property: all;
+}
+
+body > button:hover {
+	color: var(--color-background);
+	background-color: var(--color-accent);
+}
+
+body > button:active {
+	font-size: 16px;
+}
+
+body > div {
+	flex-grow: 1;
+}
+
+body > a {
+	color: var(--color-midforeground);
+	font-size: 1rem;
+	font-weight: 500;
+	font-family: var(--font-family);
+	margin-bottom: 64px;
+}

@@ -61,8 +61,9 @@ pub fn page_make(
         .map(has_auth_cookie);
 
     let login_route = warp::path("login").and(warp::fs::file("./public/pages/login/index.html"));
+    let signup_route = warp::path("signup").and(warp::fs::file("./public/pages/signup/index.html"));
 
-    home_route.or(login_route).or(routes)
+    home_route.or(login_route).or(signup_route).or(routes)
 }
 
 pub fn attach_404(
