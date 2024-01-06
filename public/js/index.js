@@ -15,7 +15,7 @@ let firstFrame = true;
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 8
+const gridWidth  = 26
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -130,12 +130,6 @@ function update() {
 		cameraX = Math.sign(cameraX) * maxOffsetX;
 	if (Math.abs(cameraY) > maxOffsetY)
 		cameraY = Math.sign(cameraY) * maxOffsetY;
-
-	// if the cap was exceeded, restart using the new camera positions
-	if (cameraX !== prevCameraX || cameraY !== prevCameraY) {
-		requestAnimationFrame(update);
-		return;
-	}
 
 	// offset board positions by camera position
 
