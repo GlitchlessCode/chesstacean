@@ -34,7 +34,6 @@ export default class MoveLiElement extends HTMLElement {
 
       padding: 24px;
       min-width: 200px;
-      margin-bottom: 16px;
 
       color: var(--color-midforeground);
       border-radius: 12px;

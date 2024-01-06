@@ -1,3 +1,4 @@
+
 export class Move {
 	startPosition;
 	finalPosition;
@@ -13,6 +14,20 @@ export class Move {
 }
 
 export class Position {
+	x;
+	y;
+
+	/**
+	 * @param {number} x
+	 * @param {number} y
+	 */
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+	}
+}
+
+export class Coordinate {
 	x;
 	y;
 
