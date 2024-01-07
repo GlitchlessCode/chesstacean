@@ -10,9 +10,11 @@
 
 		<link rel="stylesheet" href="/css/vars.css" type="text/css" />
 		<link rel="stylesheet" href="/css/index.css" type="text/css" />
+		<link rel="stylesheet" href="/css/side-window.css" type="text/css" />
 
 		<script src="/js/index.js" type="module" defer></script>
 		<script src="/js/game-popup.js" type="text/javascript" defer></script>
+		<script src="/js/side-window.js" type="text/javascript" defer></script>
 		<script src="/js/web-components/registry.js" type="module" defer></script>
 	</head>
 	<body>
@@ -54,8 +56,8 @@
 						<h1 class="guest"><a href="/login">Sign in</a> or continue as guest.</h1>
 						<h1 class="account">Welcome back, [displayname].</h1>
 						<div>
-							<button><div>create game</div></button>
-							<button><div>join game</div></button>
+							<button onclick="toggleSideWindow('create-game')"><div>create game</div></button>
+							<button onclick="toggleSideWindow('join-game')"><div>join game</div></button>
 						</div>
 					</div>
 					<div class="right"></div>
@@ -150,6 +152,27 @@
 					/>
 				</svg>
 			</div>
+		</div>
+
+		<div class="side-window create-game">
+			<div class="header">
+				<div class="title">Create Game</div>
+				<svg onclick="closeAllSideWindows()" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+					<path d="M6.4 19L5 17.6L10.6 12L5 6.4L6.4 5L12 10.6L17.6 5L19 6.4L13.4 12L19 17.6L17.6 19L12 13.4L6.4 19Z"/>
+				</svg>
+			</div>
+			<button>create game</button>
+		</div>
+
+		<div class="side-window join-game">
+			<div class="header">
+				<div class="title">Join Game</div>
+				<svg onclick="closeAllSideWindows()" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+					<path d="M6.4 19L5 17.6L10.6 12L5 6.4L6.4 5L12 10.6L17.6 5L19 6.4L13.4 12L19 17.6L17.6 19L12 13.4L6.4 19Z"/>
+				</svg>
+			</div>
+			<input type="number" placeholder="enter join code...">
+			<button>join game</button>
 		</div>
 	</body>
 </html>
