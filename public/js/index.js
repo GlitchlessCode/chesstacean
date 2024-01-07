@@ -15,7 +15,7 @@ let firstFrame = true;
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 8;
+const gridWidth  = 26;
 const gridHeight = 8;
 
 const lineThickness = 2;
@@ -199,7 +199,7 @@ function update() {
 
 	// draw pieces
 
-	// the pieces don't draw without this timeout until a second frame is called
+	// some pieces dont draw without this anonymous function usage for some reason...
 
 	(() => {
 		let row = 0;
