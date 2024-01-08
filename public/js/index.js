@@ -15,10 +15,8 @@ let firstFrame = true;
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
-const gridWidth  = 26;
+const gridWidth  = 8;
 const gridHeight = 8;
-
-const lineThickness = 2;
 
 // canvas movement
 
@@ -40,12 +38,12 @@ cnv.addEventListener("wheel", e => {
 
 	// make zooming in faster the more zoomed out you are
 	// and slower the more zoomed in you are
-	const factor = (Math.max(gridWidth, gridHeight) - zoom) / 8;
+	const factor = (Math.max(gridWidth, gridHeight) - zoom) / Math.min(gridWidth, gridHeight);
 
 	zoom -= Math.sign(e.deltaY) * factor;
 	if (zoom < 0) zoom = 0;
 
-	// -2 ensures a minimum number of tiles
+	// - 2 ensures a minimum number of tiles
 	const max = Math.max(gridWidth, gridHeight) - 2;
 
 	if (zoom > max)
@@ -153,6 +151,8 @@ function update() {
 
 	ctx.fill();
 
+	const lineWidth = 2 * tileSize / 90;
+
 	// draw vertical lines
 
 	for (let i = 1; i < gridWidth; i++) {
@@ -161,6 +161,7 @@ function update() {
 		drawLine(
 			new Coordinate(x, board.top   ),
 			new Coordinate(x, board.bottom),
+			lineWidth,
 		);
 	}
 
@@ -172,6 +173,7 @@ function update() {
 		drawLine(
 			new Coordinate(board.left,  y),
 			new Coordinate(board.right, y),
+			lineWidth,
 		);
 	}
 
@@ -180,21 +182,25 @@ function update() {
 	drawLine(
 		new Coordinate(board.left,  board.top   ),
 		new Coordinate(board.left,  board.bottom),
+		lineWidth,
 	);
 
 	drawLine(
 		new Coordinate(board.left,  board.top   ),
 		new Coordinate(board.right, board.top   ),
+		lineWidth,
 	);
 
 	drawLine(
 		new Coordinate(board.right, board.top   ),
 		new Coordinate(board.right, board.bottom),
+		lineWidth,
 	);
 
 	drawLine(
 		new Coordinate(board.left,  board.bottom),
 		new Coordinate(board.right, board.bottom),
+		lineWidth,
 	);
 
 	// draw pieces
@@ -274,14 +280,15 @@ function update() {
 /**
  * @param {Coordinate} first
  * @param {Coordinate} final
+ * @param {number} lineWidth
  */
-function drawLine(first, final) {
+function drawLine(first, final, lineWidth) {
 	ctx.beginPath();
 	ctx.moveTo(first.x, first.y);
 	ctx.lineTo(final.x, final.y);
 
 	ctx.strokeStyle = "#666666";
-	ctx.lineWidth   = lineThickness;
+	ctx.lineWidth   = lineWidth;
 	ctx.stroke();
 };
 
