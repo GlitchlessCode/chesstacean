@@ -50,14 +50,14 @@ impl Piece {
     }
 
     // get moveset for each piece
-    pub fn get_moveset(self) {
+    pub fn get_moveset(self) -> Moveset {
         match self {
-            Piece::King { .. } => (),
-            Piece::Queen { .. } => (),
-            Piece::Pawn { .. } => (),
-            Piece::Bishop { .. } => (),
-            Piece::Knight { .. } => (),
-            Piece::Rook { .. } => (),
+            Piece::King { .. } => Moveset{moves: vec![(-1, 1), (0, 1), (1, 1), (-1, 0), (1, 0), (-1, -1), (0, -1), (1, -1)] , iterative: false} ,
+            Piece::Queen { .. } => Moveset{moves: vec![(-1, 1), (0, 1), (1, 1), (-1, 0), (1, 0), (-1, -1), (0, -1), (1, -1)] , iterative: true},
+            Piece::Pawn { .. } => Moveset{moves: vec![(0, -1)], iterative: false},
+            Piece::Bishop { .. } => Moveset{moves: vec![(-1, -1), (1, 1), (1, -1), (-1, 1)] , iterative: true},
+            Piece::Knight { .. } => Moveset{moves: vec![(2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1), (-1, -2), (1, -2), (2, -1)] , iterative: false},
+            Piece::Rook { .. } => Moveset{moves: vec![(-1, 0), (1, 0), (0, -1), (0, 1)], iterative: true},
         }
     }
 
@@ -104,14 +104,21 @@ impl Piece {
         }
     }
 
-    //
+    pub fn get_all_moves(self) -> Vec<Vec<MoveList>> {
+        // get movelists for every piece
+    }
 
-    // pub fn get_moves(self) -> Vec<Vec<MoveList>> {
-
-    // }
+    pub fn get_piece_moves(self, moveset: Moveset, ) -> Vec<MoveList> {
+        // get movelist for specific piece
+        for directions in 0..num_directions {
+            
+        }
+            
+    }
 
     pub fn get_valid_moves(self) {
-        //    let moves = self.get_moves();
+        // validate all piece moves
+        //    let moves = self.get_all_moves();
     }
 
     pub fn can_move(self, id: i16) -> bool {
@@ -129,6 +136,11 @@ struct MoveLink {
     pos: Position,
     next: Arc<Option<MoveLink>>,
     prev: Weak<Option<MoveLink>>,
+}
+
+struct Moveset {
+    moves: Vec<(i8, i8)>,
+    iterative: bool,
 }
 
 enum Progress<T> {
