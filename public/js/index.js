@@ -3,14 +3,6 @@
 import pieces from "./pieces.js";
 import { Coordinate } from "./components.js";
 
-// canvas setup
-
-/** @type {HTMLCanvasElement} */
-const cnv = document.getElementById("game-board");
-const ctx = cnv.getContext('2d');
-
-let firstFrame = true;
-
 // board tracking
 
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
@@ -33,7 +25,7 @@ let maxOffsetY = 0;
 
 // zooming
 
-cnv.addEventListener("wheel", e => {
+canvas.addEventListener("wheel", e => {
 	e.preventDefault();
 
 	// make zooming in faster the more zoomed out you are
@@ -54,8 +46,8 @@ cnv.addEventListener("wheel", e => {
 
 // dragging
 
-cnv.addEventListener("mousedown", e => {
-	const rect = cnv.getBoundingClientRect();
+canvas.addEventListener("mousedown", e => {
+	const rect = canvas.getBoundingClientRect();
 
 	dragging = {
 		x: e.clientX - rect.left + cameraX,
@@ -63,14 +55,14 @@ cnv.addEventListener("mousedown", e => {
 	};
 });
 
-cnv.addEventListener("mousemove", e => {
+canvas.addEventListener("mousemove", e => {
 	if (!dragging)
 		return;
 
-	const rect = cnv.getBoundingClientRect();
+	const rect = canvas.getBoundingClientRect();
 
-	cnv.setAttribute("width",  rect.width );
-	cnv.setAttribute("height", rect.height);
+	canvas.setAttribute("width",  rect.width );
+	canvas.setAttribute("height", rect.height);
 
 	cameraX = dragging.x - (e.clientX - rect.left);
 	cameraY = dragging.y - (e.clientY - rect.top );
@@ -83,37 +75,48 @@ cnv.addEventListener("mousemove", e => {
 // stop dragging regardless of if on canvas anymore or not
 addEventListener("mouseup", () => dragging = false);
 
+// board definition
+
+/**
+ * @type     {object}
+ * @property {number} tilesize
+ * @property {() => undefined} recalculateTilesize
+ */
+const board = {};
+
+board.recalculateTilesize = function() {
+	// adjust grid sizes based on zoom
+
+	const scaledGridWidth  = Math.max(gridWidth  - zoom, 0);
+	const scaledGridHeight = Math.max(gridHeight - zoom, 0);
+
+	// determine tile sizes based on grid width
+
+	const tileWidth  = canvas.width  / scaledGridWidth;
+	const tileHeight = canvas.height / scaledGridHeight;
+
+	board.tilesize = Math.min(tileWidth, tileHeight);
+};
+
+// move pieces
+
+canvas.addEventListener("click", e => {
+});
+
 function update() {
-	ctx.clearRect(0, 0, cnv.width, cnv.height);
+	context.clearRect(0, 0, canvas.width, canvas.height);
 
-	const scaledGridWidth = (() => {
-		const scaledGridWidth = gridWidth - zoom;
-		return scaledGridWidth < 0 ? 0 : scaledGridWidth;
-	})();
-
-	const scaledGridHeight = (() => {
-		const scaledGridHeight = gridHeight - zoom;
-		return scaledGridHeight < 0 ? 0 : scaledGridHeight;
-	})();
-
-	// calculate the size of each tile
-
-	const tileSize = (() => {
-		const tileWidth  = cnv.width  / scaledGridWidth;
-		const tileHeight = cnv.height / scaledGridHeight;
-
-		return Math.min(tileWidth, tileHeight);
-	})();
+	board.recalculateTilesize();
 
 	// calculate the board positions
 	// center the grid within the board
 
 	const board  = {};
 
-	board.top    = (cnv.height - tileSize * gridHeight) / 2;
-	board.left   = (cnv.width  - tileSize * gridWidth ) / 2;
-	board.right  =  cnv.width  - board.left;
-	board.bottom =  cnv.height - board.top;
+	board.top    = (canvas.height - board.tilesize * gridHeight) / 2;
+	board.left   = (canvas.width  - board.tilesize * gridWidth ) / 2;
+	board.right  =  canvas.width  - board.left;
+	board.bottom =  canvas.height - board.top;
 
 	maxOffsetX = Math.abs(board.left);
 	maxOffsetY = Math.abs(board.top);
@@ -138,27 +141,27 @@ function update() {
 
 	// draw tiles
 
-	ctx.fillStyle = "#101010";
+	context.fillStyle = "#101010";
 
 	for (let col = 0; col < gridHeight; col++)
 		// col % 2 is used to checker the board by switching the starting position
 		for (let row = col % 2; row < gridWidth; row += 2) {
-			const x = board.left + tileSize * row;
-			const y = board.top  + tileSize * col;
+			const x = board.left + board.tilesize * row;
+			const y = board.top  + board.tilesize * col;
 
-			ctx.rect(x, y, tileSize, tileSize);
+			context.rect(x, y, board.tilesize, board.tilesize);
 		}
 
-	ctx.fill();
+	context.fill();
 
-	const lineWidth = 2 * tileSize / 90;
+	const lineWidth = 2 * board.tilesize / 90;
 
 	// draw vertical lines
 
 	for (let i = 1; i < gridWidth; i++) {
-		const x = board.left + tileSize * i;
+		const x = board.left + board.tilesize * i;
 
-		drawLine(
+		canvas.line(
 			new Coordinate(x, board.top   ),
 			new Coordinate(x, board.bottom),
 			lineWidth,
@@ -168,9 +171,9 @@ function update() {
 	// draw horizontal lines
 
 	for (let i = 1; i < gridHeight; i++) {
-		const y = board.top + tileSize * i;
+		const y = board.top + board.tilesize * i;
 
-		drawLine(
+		canvas.line(
 			new Coordinate(board.left,  y),
 			new Coordinate(board.right, y),
 			lineWidth,
@@ -179,25 +182,25 @@ function update() {
 
 	// draw borders
 
-	drawLine(
+	canvas.line(
 		new Coordinate(board.left,  board.top   ),
 		new Coordinate(board.left,  board.bottom),
 		lineWidth,
 	);
 
-	drawLine(
+	canvas.line(
 		new Coordinate(board.left,  board.top   ),
 		new Coordinate(board.right, board.top   ),
 		lineWidth,
 	);
 
-	drawLine(
+	canvas.line(
 		new Coordinate(board.right, board.top   ),
 		new Coordinate(board.right, board.bottom),
 		lineWidth,
 	);
 
-	drawLine(
+	canvas.line(
 		new Coordinate(board.left,  board.bottom),
 		new Coordinate(board.right, board.bottom),
 		lineWidth,
@@ -224,10 +227,10 @@ function update() {
 				return;
 			}
 
-			const x = board.left + col * tileSize;
-			const y = board.top  + row * tileSize;
+			const x = board.left + col * board.tilesize;
+			const y = board.top  + row * board.tilesize;
 
-			ctx.drawImage(pieces[character], x, y, tileSize, tileSize);
+			context.drawImage(pieces[character], x, y, board.tilesize, board.tilesize);
 
 			col++;
 		});
@@ -235,70 +238,49 @@ function update() {
 
 	// draw numbering and lettering
 
-	const labelMargin = 5/60 * tileSize;
+	const labelMargin = 5/60 * board.tilesize;
 
-	ctx.font      = `${12/60 * tileSize}px Inter, sans-serif`;
-	ctx.fillStyle = "#DDDDDD";
+	context.font      = `${12/60 * board.tilesize}px Inter, sans-serif`;
+	context.fillStyle = "#DDDDDD";
 
 	// vertical numbering
 
-	ctx.textAlign    = "left";
-	ctx.textBaseline = "top";
+	context.textAlign    = "left";
+	context.textBaseline = "top";
 
 	const numberingX = board.left + labelMargin;
 
 	for (let i = 0; i < gridHeight; i++) {
 		const label      = gridHeight - i;
-		const numberingY = board.top + tileSize * i + labelMargin;
+		const numberingY = board.top + board.tilesize * i + labelMargin;
 
-		ctx.fillText(label, numberingX, numberingY);
+		context.fillText(label, numberingX, numberingY);
 	}
 
 	// horizontal numbering
 
-	ctx.textAlign    = "right";
-	ctx.textBaseline = "bottom";
+	context.textAlign    = "right";
+	context.textBaseline = "bottom";
 
 	const letteringY = board.bottom - labelMargin;
 
 	for (let i = 0; i < gridWidth; i++) {
 		const label      = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
-		const letteringX = board.left + tileSize * (i + 1) - labelMargin;
+		const letteringX = board.left + board.tilesize * (i + 1) - labelMargin;
 
-		ctx.fillText(label, letteringX, letteringY);
+		context.fillText(label, letteringX, letteringY);
 	}
 
-	// the piece images dont render on the first frame for some reason,
-	// so re-render the frame if this was the first
-
-	if (firstFrame) {
-		firstFrame = false;
-		requestAnimationFrame(update);
-	}
+	setTimeout(() => requestAnimationFrame(update), 1000);
 }
 
-/**
- * @param {Coordinate} first
- * @param {Coordinate} final
- * @param {number} lineWidth
- */
-function drawLine(first, final, lineWidth) {
-	ctx.beginPath();
-	ctx.moveTo(first.x, first.y);
-	ctx.lineTo(final.x, final.y);
-
-	ctx.strokeStyle = "#666666";
-	ctx.lineWidth   = lineWidth;
-	ctx.stroke();
-};
-
-cnv.addEventListener("resize", () => {
-	cnv.width  = Math.floor(cnv.getBoundingClientRect().width );
-	cnv.height = Math.floor(cnv.getBoundingClientRect().height);
+canvas.addEventListener("resize", () => {
+	canvas.width  = Math.floor(canvas.getBoundingClientRect().width );
+	canvas.height = Math.floor(canvas.getBoundingClientRect().height);
 
 	requestAnimationFrame(update);
 });
 
-cnv.dispatchEvent(new Event("resize"));
+canvas.dispatchEvent(new Event("resize"));
 
 requestAnimationFrame(update);
