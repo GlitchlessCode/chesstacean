@@ -12,8 +12,9 @@ use warp::{
 };
 
 use crate::chess::game::{
-    network::{Action, ApprovedChatMessage, ChatMessage},
+    network::{ActionType, ApprovedChatMessage, ChatMessage},
     pieces::Move,
+    GameConfig,
 };
 
 static ID: AtomicU64 = AtomicU64::new(0);
@@ -108,13 +109,26 @@ pub enum GameEvent {
 
 #[derive(Deserialize)]
 pub enum RecievedMessage {
-    Join,
+    // * Host controls
+    CreateLobby,
+    CloseLobby,
+    StartLobby { config: GameConfig },
+
+    // * Client controls
+    JoinLobby { code: String },
+    LeaveLobby,
+
+    // * Matchmaking controls
+    JoinQueue,
+    LeaveQueue,
+
+    // * Ingame controls
     GameAction { action: GameAction },
 }
 
 #[derive(Deserialize)]
 pub enum GameAction {
-    Message { msg: ChatMessage },
+    Message { msg: String },
     Turn { turn: Move },
-    Action { action: Action },
+    Action { action: ActionType },
 }

@@ -10,6 +10,8 @@ use tokio::sync::mpsc::Receiver;
 pub struct Registry {
     pub users: RwLock<HashMap<String, UserConnection>>,
     active_sessions: RwLock<HashSet<String>>,
+
+    controller: Arc<GameControllerInterface>,
 }
 
 impl Registry {
@@ -17,6 +19,7 @@ impl Registry {
         Arc::new(Self {
             users: RwLock::new(HashMap::new()),
             active_sessions: RwLock::new(HashSet::new()),
+            controller: Arc::new(GameControllerInterface::new()),
         })
     }
 
@@ -99,7 +102,7 @@ impl Registry {
                             display: parse.us.get_display(),
                         })
                         .await;
-                        let user_conn = UserConnection::from(parse.us);
+                        let user_conn = UserConnection::from((parse.us, self.controller.clone()));
                         user_conn.add_connection(conn, parse.sub).await;
                         user_writer.insert(key, user_conn);
                     }
