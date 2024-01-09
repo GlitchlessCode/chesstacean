@@ -1,5 +1,5 @@
 
-export class Move {
+class Move {
 	startPosition;
 	finalPosition;
 
@@ -13,7 +13,7 @@ export class Move {
 	}
 }
 
-export class Position {
+class Position {
 	x;
 	y;
 
@@ -27,16 +27,4 @@ export class Position {
 	}
 }
 
-export class Coordinate {
-	x;
-	y;
-
-	/**
-	 * @param {number} x
-	 * @param {number} y
-	 */
-	constructor(x, y) {
-		this.x = x;
-		this.y = y;
-	}
-}
+export { Move, Position };
