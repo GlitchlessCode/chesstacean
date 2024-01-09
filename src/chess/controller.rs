@@ -1,7 +1,7 @@
-use super::game::{network::PlayerInterface, InactiveGame};
+use super::game::{network::PlayerInterface, GameConfig, InactiveGame};
 use crate::{server::user::UserInfo, traits::ChooseTake};
 use rand::{thread_rng, Rng};
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
     sync::RwLock,
     time::{self, Instant},
@@ -9,17 +9,67 @@ use tokio::{
 
 pub struct GameControllerInterface {
     matchmaker: Arc<Matchmaker>,
+    lobby_manager: RwLock<LobbyManager>,
 }
-
+// TODO: Convert a lot of the UserInfo parts to include Targets for transmission
 impl GameControllerInterface {
     pub fn new() -> Self {
         let matchmaker = Matchmaker::new();
         Matchmaker::start(matchmaker.clone());
-        Self { matchmaker }
+
+        let lobby_manager = RwLock::new(LobbyManager::new());
+
+        Self {
+            matchmaker,
+            lobby_manager,
+        }
     }
 
     pub fn join_queue(&self) {}
     pub fn leave_queue(&self) {}
+
+    pub fn create_lobby(&self) {}
+    pub fn close_lobby(&self) {}
+    pub fn start_lobby(&self) {}
+
+    pub fn join_lobby(&self) {}
+    pub fn leave_lobby(&self) {}
+}
+
+struct LobbyManager {
+    code_lobbies: HashMap<String, Arc<Lobby>>,
+    user_lobbies: HashMap<UserInfo, Arc<Lobby>>,
+}
+
+impl LobbyManager {
+    fn new() -> Self {
+        Self {
+            code_lobbies: HashMap::new(),
+            user_lobbies: HashMap::new(),
+        }
+    }
+
+    fn create_lobby(&self, user: &UserInfo) {}
+    fn close_lobby(&self, user: &UserInfo) {}
+    fn start_lobby(&self, user: &UserInfo, config: GameConfig) {}
+
+    fn join_lobby(&self, user: &UserInfo) {}
+    fn leave_lobby(&self, user: &UserInfo) {}
+}
+
+struct Lobby {
+    host: UserInfo,
+    client: Option<UserInfo>,
+}
+
+impl Lobby {
+    fn new(host: UserInfo) -> Arc<Self> {
+        Arc::new(Self { host, client: None })
+    }
+
+    fn is_host(&self, user: &UserInfo) -> bool {
+        &self.host == user
+    }
 }
 
 struct Matchmaker {
@@ -65,10 +115,10 @@ impl Matchmaker {
             let (player1, p1_rx) = PlayerInterface::create(player1.user);
             let (player2, p2_rx) = PlayerInterface::create(player2.user);
 
-            // Create game interfaces
+            // TODO: Create game interfaces
 
             // Start game
-            let game = InactiveGame::new(player1, rng.gen());
+            let game = InactiveGame::new(player1, GameConfig::default());
             game.start(player2);
         }
     }
@@ -83,10 +133,10 @@ pub struct UserInQueue {
 }
 
 impl UserInQueue {
-    pub fn new(user: UserInfo) -> Self {
+    pub fn new(user: &UserInfo) -> Self {
         let now = Instant::now();
         Self {
-            user,
+            user: user.clone(),
             timestamp: now, // Currently timestamp is not used, but is included for if we change the matchmaking algo
             rating: 1200, // Currently Rating does not change, and is just a static value applied to every player. Additionally rating is not used for matchmaking currently
         }

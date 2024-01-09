@@ -2,7 +2,7 @@ use super::{
     utils::{ArcLock, ArcLockTrait},
     ws,
 };
-use crate::server::ws::Connection;
+use crate::{chess::controller::GameControllerInterface, server::ws::Connection};
 use anyhow::Result;
 use interface::GameInterface;
 use serde::{Deserialize, Serialize};
@@ -72,11 +72,11 @@ impl UserConnection {
     pub async fn send(&self) {}
 }
 
-impl From<UserInfo> for UserConnection {
-    fn from(value: UserInfo) -> Self {
+impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
+    fn from((value, controller): (UserInfo, Arc<GameControllerInterface>)) -> Self {
         let (tx, rx) = mpsc::channel(2);
         let connections = ArcLock::new_arclock(HashMap::new());
-        let listener = Arc::new(ConnectionListener::new(Arc::clone(&connections), tx));
+        let listener = Arc::new(ConnectionListener::new(Arc::clone(&connections), tx, controller));
         let this = Self {
             info: RwLock::new(value),
             connections,
@@ -90,7 +90,7 @@ impl From<UserInfo> for UserConnection {
 struct ConnectionListener {
     connections: ArcLock<HashMap<String, SessionConnections>>,
     targets: RwLock<HashMap<String, GameInterface>>,
-    // controller:
+    controller: Arc<GameControllerInterface>,
     interrupt: mpsc::Sender<()>,
 }
 
@@ -143,11 +143,16 @@ impl ConnectionListener {
         }
     }
 
-    fn new(connections: ArcLock<HashMap<String, SessionConnections>>, interrupt: mpsc::Sender<()>) -> Self {
+    fn new(
+        connections: ArcLock<HashMap<String, SessionConnections>>,
+        interrupt: mpsc::Sender<()>,
+        controller: Arc<GameControllerInterface>,
+    ) -> Self {
         Self {
             connections,
             targets: RwLock::new(HashMap::new()),
             interrupt,
+            controller,
         }
     }
 
@@ -207,7 +212,7 @@ impl SessionConnections {
 
 static GUEST_COUNT: AtomicU32 = AtomicU32::new(1);
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UserInfo {
     User { handle: String, display: String },
     Guest { guest_num: u32 },
