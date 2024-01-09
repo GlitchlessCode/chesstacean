@@ -120,7 +120,10 @@ export default class AppElement extends HTMLElement {
   constructor() {
     super();
 
-    this.#shadowRoot = this.attachShadow({ mode: "closed", slotAssignment: "manual" });
+    this.#shadowRoot = this.attachShadow({
+      mode: "closed",
+      slotAssignment: "manual",
+    });
     this.#shadowRoot.adoptedStyleSheets = [AppElement.#shadowStyle];
     this.#shadowRoot.append(
       document.importNode(AppElement.#shadowTemplate.content, true)
@@ -136,15 +139,12 @@ export default class AppElement extends HTMLElement {
 
   clear() {
     this.#actionQueue.push({ type: "clear" });
-    console.log(this.#running);
     if (!this.#running) this.#run();
   }
 
   assign(node) {
     if (!(node instanceof HTMLElement))
       return TypeError("node must be an instance of type HTMLElement");
-
-    console.log(this.#running);
     this.#actionQueue.push({ type: "assign", content: node });
     if (!this.#running) this.#run();
   }
@@ -159,7 +159,6 @@ export default class AppElement extends HTMLElement {
     (async () => {
       while (this.#actionQueue.length > 0) {
         const action = this.#actionQueue.shift();
-        console.log(action);
         switch (action.type) {
           case "assign": {
             await this.#assign(action.content);

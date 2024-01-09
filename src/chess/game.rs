@@ -7,7 +7,7 @@ use tokio::{sync::broadcast, time::sleep};
 
 use self::{
     board::Board,
-    network::{ApprovedChatMessage, MessageInterface, PlayerInterface},
+    network::{ActionInterface, ApprovedChatMessage, MessageInterface, PlayerInterface},
     pieces::ValidMove,
 };
 
@@ -23,7 +23,9 @@ pub struct Game<S> {
     board: board::Board,
     move_history: Vec<ValidMove>,
 
-    messenger: Arc<MessageInterface>,
+    actions: ActionInterface,
+
+    pub messenger: Arc<MessageInterface>,
 
     state: S,
 }
@@ -38,15 +40,18 @@ pub struct InactiveGame {
     config: GameConfig,
     player1: PlayerInterface,
 
-    messenger: Arc<MessageInterface>,
+    actions: ActionInterface,
+
+    pub messenger: Arc<MessageInterface>,
 }
 
 impl InactiveGame {
-    pub fn new(interface: PlayerInterface, config: GameConfig) -> Self {
+    pub fn new(interface: PlayerInterface, actions: ActionInterface, config: GameConfig) -> Self {
         Self {
             config,
             player1: interface,
             messenger: MessageInterface::create(),
+            actions,
         }
     }
 
@@ -84,6 +89,8 @@ impl From<(InactiveGame, PlayerInterface)> for Game<PlayerTurn> {
             move_history: vec![],
 
             messenger: value.messenger,
+
+            actions: value.actions,
 
             state: PlayerTurn {
                 turn: match value.config.white_starts {
@@ -146,6 +153,8 @@ impl From<Game<PlayerTurn>> for Game<Calculating> {
 
             messenger: value.messenger,
 
+            actions: value.actions,
+
             state: Calculating {
                 last_turn: value.state.turn,
             },
@@ -175,6 +184,8 @@ impl From<Game<Calculating>> for Game<PlayerTurn> {
 
             messenger: value.messenger,
 
+            actions: value.actions,
+
             state: PlayerTurn {
                 turn: value.state.last_turn.switch(),
             },
@@ -191,6 +202,8 @@ impl From<(Game<Calculating>, Winner, EndState)> for Game<Ended> {
             move_history: value.0.move_history,
 
             messenger: value.0.messenger,
+
+            actions: value.0.actions,
 
             state: Ended {
                 winner: value.1,

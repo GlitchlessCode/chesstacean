@@ -1,9 +1,15 @@
-use super::game::{network::PlayerInterface, GameConfig, InactiveGame};
-use crate::{server::user::UserInfo, traits::ChooseTake};
-use rand::{thread_rng, Rng};
+use super::game::{
+    network::{ActionInterface, PlayerInterface},
+    GameConfig, InactiveGame,
+};
+use crate::{
+    server::user::{interface::GameInterface, UserInfo},
+    traits::ChooseTake,
+};
+use rand::thread_rng;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
-    sync::RwLock,
+    sync::{oneshot, RwLock},
     time::{self, Instant},
 };
 
@@ -37,15 +43,15 @@ impl GameControllerInterface {
 }
 
 struct LobbyManager {
-    code_lobbies: HashMap<String, Arc<Lobby>>,
-    user_lobbies: HashMap<UserInfo, Arc<Lobby>>,
+    codes: HashMap<String, Arc<Lobby>>,
+    users: HashMap<UserInfo, Arc<Lobby>>,
 }
 
 impl LobbyManager {
     fn new() -> Self {
         Self {
-            code_lobbies: HashMap::new(),
-            user_lobbies: HashMap::new(),
+            codes: HashMap::new(),
+            users: HashMap::new(),
         }
     }
 
@@ -112,14 +118,27 @@ impl Matchmaker {
             let player2 = queue.take_random(&mut rng).unwrap();
 
             // Create player interfaces
-            let (player1, p1_rx) = PlayerInterface::create(player1.user);
-            let (player2, p2_rx) = PlayerInterface::create(player2.user);
+            let (player1_interface, p1_move_rx, p1_event_rx) = PlayerInterface::create(player1.user.clone());
+            let (player2_interface, p2_move_rx, p2_event_rx) = PlayerInterface::create(player2.user.clone());
 
-            // TODO: Create game interfaces
+            // Create actions interface
+            let (actions, action_rx) = ActionInterface::create();
+
+            // Create game
+            let game = InactiveGame::new(player1_interface, actions, GameConfig::default());
+
+            // TODO: Create game interface
+            let p1_msg = game.messenger.channel();
+            let player1_game_interface =
+                GameInterface::new(p1_move_rx, action_rx.clone(), p1_event_rx, p1_msg.0, p1_msg.1);
+            player1.reply(player1_game_interface);
+
+            let p2_msg = game.messenger.channel();
+            let player2_game_interface = GameInterface::new(p2_move_rx, action_rx, p2_event_rx, p2_msg.0, p2_msg.1);
+            player2.reply(player2_game_interface);
 
             // Start game
-            let game = InactiveGame::new(player1, GameConfig::default());
-            game.start(player2);
+            game.start(player2_interface);
         }
     }
 }
@@ -128,17 +147,27 @@ pub struct UserInQueue {
     user: UserInfo,
     rating: u16,
     timestamp: Instant,
+
+    reply_to: oneshot::Sender<GameInterface>,
     // Stats can go here to help with matchmaking, if necessary
     // stats: STUFF
 }
 
 impl UserInQueue {
-    pub fn new(user: &UserInfo) -> Self {
+    fn new(user: &UserInfo, reply_to: oneshot::Sender<GameInterface>) -> Self {
         let now = Instant::now();
         Self {
             user: user.clone(),
             timestamp: now, // Currently timestamp is not used, but is included for if we change the matchmaking algo
             rating: 1200, // Currently Rating does not change, and is just a static value applied to every player. Additionally rating is not used for matchmaking currently
+            reply_to,
         }
+    }
+    pub fn create(user: &UserInfo) -> (Self, oneshot::Receiver<GameInterface>) {
+        let (reply_to, reply_rx) = oneshot::channel();
+        (Self::new(user, reply_to), reply_rx)
+    }
+    fn reply(self, interface: GameInterface) {
+        self.reply_to.send(interface).unwrap();
     }
 }

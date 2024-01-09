@@ -13,16 +13,36 @@ use super::{
 pub struct PlayerInterface {
     user: UserInfo,
     reciever_tx: mpsc::Sender<oneshot::Sender<(Move, oneshot::Sender<bool>)>>,
+
+    event_interface: EventInterface,
 }
 
 impl PlayerInterface {
-    fn new(user: UserInfo, tx: mpsc::Sender<oneshot::Sender<(Move, oneshot::Sender<bool>)>>) -> Self {
-        Self { user, reciever_tx: tx }
+    fn new(
+        user: UserInfo,
+        tx: mpsc::Sender<oneshot::Sender<(Move, oneshot::Sender<bool>)>>,
+        event_tx: mpsc::Sender<Event>,
+    ) -> Self {
+        Self {
+            user: user.clone(),
+            reciever_tx: tx,
+            event_interface: EventInterface {
+                user,
+                transmitter: event_tx,
+            },
+        }
     }
-    pub fn create(user: UserInfo) -> (Self, mpsc::Receiver<oneshot::Sender<(Move, oneshot::Sender<bool>)>>) {
+    pub fn create(
+        user: UserInfo,
+    ) -> (
+        Self,
+        mpsc::Receiver<oneshot::Sender<(Move, oneshot::Sender<bool>)>>,
+        mpsc::Receiver<Event>,
+    ) {
         let (tx, rx) = mpsc::channel(2);
-        let this = Self::new(user, tx);
-        (this, rx)
+        let (e_tx, e_rx) = mpsc::channel(2);
+        let this = Self::new(user, tx, e_tx);
+        (this, rx, e_rx)
     }
     pub async fn valid_move(&self, board: &Board) -> Result<ValidMove, ()> {
         loop {
@@ -47,7 +67,7 @@ impl PlayerInterface {
                 if result_tx.send(false).is_err() {
                     return Err(());
                 }
-                // Loop again
+                // * Loop again
             }
         }
     }
@@ -161,13 +181,43 @@ pub struct ApprovedChatMessage {
 }
 
 pub struct ActionInterface {
-    reciever_tx: watch::Sender<mpsc::Sender<Action>>,
+    reciever_tx: watch::Sender<Option<mpsc::Sender<Action>>>,
+}
+
+impl ActionInterface {
+    fn new(reciever_tx: watch::Sender<Option<mpsc::Sender<Action>>>) -> Self {
+        Self { reciever_tx }
+    }
+    pub fn create() -> (Self, watch::Receiver<Option<mpsc::Sender<Action>>>) {
+        let (tx, rx) = watch::channel(None);
+        (Self::new(tx), rx)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Action {
     sender: UserInfo,
     kind: ActionType,
+}
+
+pub struct EventInterface {
+    user: UserInfo,
+    transmitter: mpsc::Sender<Event>,
+}
+
+#[derive(Serialize)]
+pub enum Event {
+    OfferDraw,
+
+    RequestUndo,
+    MoveWasUndone(ValidMove),
+
+    GameEnd(),
+
+    YourTurn,
+    YourTurnEnded,
+
+    ValidMove(ValidMove),
 }
 
 #[derive(Serialize, Deserialize)]
