@@ -152,16 +152,25 @@ function update() {
 
 	// vertical numbering
 
+	canvas.ctx.font      = font;
+	canvas.ctx.fillStyle = "#DDDDDD";
+
+	canvas.ctx.align    = "left";
+	canvas.ctx.baseline = "top";
+
 	const numberingX = board.left + labelMargin;
 
 	for (let i = 0; i < board.gridheight; i++) {
 		const label      = board.gridheight - i;
 		const numberingY = board.top + board.tilesize * i + labelMargin;
 
-		canvas.text(label, numberingX, numberingY, font, "left", "top");
+		canvas.text(label, numberingX, numberingY);
 	}
 
 	// horizontal numbering
+
+	canvas.ctx.align    = "right";
+	canvas.ctx.baseline = "bottom";
 
 	const letteringY = board.bottom - labelMargin;
 
@@ -169,7 +178,7 @@ function update() {
 		const label      = board.gridwidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
 		const letteringX = board.left + board.tilesize * (i + 1) - labelMargin;
 
-		canvas.text(label, letteringX, letteringY, font, "right", "bottom");
+		canvas.text(label, letteringX, letteringY);
 	}
 
 	// in case images didn't load properly

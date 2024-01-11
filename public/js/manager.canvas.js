@@ -43,13 +43,7 @@ canvas.rect = function(point, width, height) {
 	this.ctx.fill();
 };
 
-canvas.text = function(text, x, y, font, align, baseline) {
-	this.ctx.font      = font;
-	this.ctx.fillStyle = "#DDDDDD";
-
-	this.ctx.textAlign    = align;
-	this.ctx.textBaseline = baseline;
-
+canvas.text = function(text) {
 	this.ctx.fillText(text, x, y);
 };
 
