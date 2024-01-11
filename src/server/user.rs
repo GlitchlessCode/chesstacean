@@ -2,7 +2,10 @@ use super::{
     utils::{ArcLock, ArcLockTrait},
     ws,
 };
-use crate::{chess::controller::GameControllerInterface, server::ws::Connection};
+use crate::{
+    chess::controller::GameControllerInterface,
+    server::ws::{Connection, RecievedMessage, SentMessage},
+};
 use anyhow::Result;
 use interface::GameInterface;
 use serde::{Deserialize, Serialize};
@@ -20,6 +23,26 @@ use tokio::{
 
 pub mod interface;
 pub mod registry;
+
+#[allow(async_fn_in_trait)]
+pub trait Sender {
+    async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>>;
+
+    /// ### Serializes the message, and sends it to all connected sessions
+    ///
+    /// # Panics
+    async fn send(&self, msg: impl Serialize) {
+        let msg = match serde_json::to_string(&msg) {
+            Ok(msg) => msg,
+            Err(e) => {
+                return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n > ");
+            }
+        };
+        for conn in self.connections().await.values() {
+            conn.send(msg.clone()).await;
+        }
+    }
+}
 
 pub struct UserConnection {
     pub info: RwLock<UserInfo>,
@@ -69,7 +92,12 @@ impl UserConnection {
         let reader = self.connections.read().await;
         reader.contains_key(session)
     }
-    pub async fn send(&self) {}
+}
+
+impl Sender for UserConnection {
+    async fn connections(&self) -> tokio::sync::RwLockReadGuard<HashMap<String, SessionConnections>> {
+        self.connections.read().await
+    }
 }
 
 impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
@@ -118,7 +146,6 @@ impl ConnectionListener {
             if let ListenerResult::Result(r) = result {
                 match r {
                     ws::ListenerResult::Disconnected(id) => {
-                        eprint!("\rUser {} has disconnected\n > ", id);
                         let mut hash_map = self.connections.write().await;
                         'inner: for (_, session) in (*hash_map).iter_mut() {
                             if session.close_connection(id).await {
@@ -129,17 +156,29 @@ impl ConnectionListener {
                     }
                     ws::ListenerResult::Error(err) => {
                         eprint!("\rNew Error: {err}\n > ");
+                        self.send(SentMessage::error(
+                            "The server experienced an error handling your request",
+                        ))
+                        .await;
                     }
-                    ws::ListenerResult::Message(msg) => {
+                    ws::ListenerResult::Text(msg) => {
                         eprint!("\rNew Message: {msg:?}\n > ");
+                        let result = serde_json::from_str::<'_, RecievedMessage>(&msg);
+                        match result {
+                            Err(_) => {
+                                self.send(SentMessage::error(
+                                    "The server experienced an error handling your request",
+                                ))
+                                .await
+                            }
+                            Ok(action) => {
+                                tokio::task::spawn(ConnectionListener::handle_message(self.clone(), action));
+                            }
+                        }
                     }
                     ws::ListenerResult::Ignore => (),
                 }
             }
-
-            // futures.join_next().await;
-
-            // drop(futures);
         }
     }
 
@@ -160,6 +199,19 @@ impl ConnectionListener {
         self.interrupt.send(()).await?;
         Ok(())
     }
+
+    async fn handle_message(self: Arc<Self>, action: RecievedMessage) {
+        match action {
+            RecievedMessage::ControlAction { action } => (),
+            RecievedMessage::GameAction { action } => (),
+        }
+    }
+}
+
+impl Sender for ConnectionListener {
+    async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>> {
+        self.connections.read().await
+    }
 }
 
 enum ListenerResult {
@@ -167,7 +219,7 @@ enum ListenerResult {
     Result(ws::ListenerResult),
 }
 
-struct SessionConnections {
+pub struct SessionConnections {
     connections: Vec<Arc<Connection>>,
 }
 
@@ -206,6 +258,11 @@ impl SessionConnections {
                     .await
                     .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n > "));
             }
+        }
+    }
+    async fn send(&self, msg: String) {
+        for conn in self.connections.iter() {
+            conn.send(&msg).await;
         }
     }
 }

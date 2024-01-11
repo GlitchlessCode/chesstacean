@@ -19,7 +19,7 @@ impl Registry {
         Arc::new(Self {
             users: RwLock::new(HashMap::new()),
             active_sessions: RwLock::new(HashSet::new()),
-            controller: Arc::new(GameControllerInterface::new()),
+            controller: GameControllerInterface::new(),
         })
     }
 
@@ -77,7 +77,7 @@ impl Registry {
 
                 if let Ok(parse) = parse {
                     if !parse.valid() {
-                        conn.send(SentMessage::error("Token expired")).await;
+                        conn.send_serde(SentMessage::error("Token expired")).await;
                         return;
                     }
 
@@ -92,13 +92,13 @@ impl Registry {
                     };
 
                     if let Some(user_conn) = user_writer.get(&key) {
-                        conn.send(SentMessage::Connected {
+                        conn.send_serde(SentMessage::WsConnected {
                             display: parse.us.get_display(),
                         })
                         .await;
                         user_conn.add_connection(conn, parse.sub).await;
                     } else {
-                        conn.send(SentMessage::Connected {
+                        conn.send_serde(SentMessage::WsConnected {
                             display: parse.us.get_display(),
                         })
                         .await;
@@ -107,7 +107,7 @@ impl Registry {
                         user_writer.insert(key, user_conn);
                     }
                 } else {
-                    conn.send(SentMessage::error("Unauthorized to connect")).await;
+                    conn.send_serde(SentMessage::error("Unauthorized to connect")).await;
                 }
             }
         } else {
