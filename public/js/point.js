@@ -13,5 +13,3 @@ class Point {
 		this.y = y;
 	}
 }
-
-export default Point;

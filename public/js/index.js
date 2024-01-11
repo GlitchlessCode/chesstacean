@@ -1,33 +1,11 @@
 "use strict";
 
-// import utilities
-
-import pieces from "./pieces.js";
-
-// import components
-
-import Board from "./board.js";
-import Point from "./point.js";
-import Camera from "./camera.js";
-import Canvas from "./canvas.js";
-
-// define constants
-
-const DEFAULT_GRID_WIDTH  = 8;
-const DEFAULT_GRID_HEIGHT = 8;
-
-// setup
-
-const board  = new Board(DEFAULT_GRID_WIDTH, DEFAULT_GRID_HEIGHT);
-const camera = new Camera(0, 0, 0);
-
-const canvas = new Canvas(document.getElementById("game-board"), board, camera);
-
 // board layout in fen notation
 const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 
 let maxOffsetX = 0;
 let maxOffsetY = 0;
+let firstRender = true;
 
 function update() {
 	canvas.clear();
@@ -37,8 +15,8 @@ function update() {
 	board.tilesize = (() => {
 		// adjust grid sizes based on zoom
 
-		const zoomedGridwidth  = Math.max(board.gridwidth  - camera.zoom, 0);
-		const zoomedGridheight = Math.max(board.gridheight - camera.zoom, 0);
+		const zoomedGridwidth  = Math.max(board.gridwidth  - camera.z, 0);
+		const zoomedGridheight = Math.max(board.gridheight - camera.z, 0);
 
 		// determine tile sizes based on grid width
 
@@ -194,7 +172,11 @@ function update() {
 		canvas.text(label, letteringX, letteringY, font, "right", "bottom");
 	}
 
-	setTimeout(() => requestAnimationFrame(update), 1000);
+	// in case images didn't load properly
+	if (firstRender) {
+		firstRender = false;
+		requestAnimationFrame(update);
+	}
 }
 
 requestAnimationFrame(update);

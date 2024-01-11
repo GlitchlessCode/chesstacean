@@ -12,5 +12,3 @@ const pieces = {};
 	pieces[black].src = `./img/pieces/b${black}.svg`;
 	pieces[white].src = `./img/pieces/w${white}.svg`;
 });
-
-export default pieces;
