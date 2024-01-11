@@ -3,121 +3,92 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-pub enum Piece {
-    King { color: TeamColor, position: Position },
-    Queen { color: TeamColor, position: Position },
-    Pawn { color: TeamColor, position: Position },
-    Bishop { color: TeamColor, position: Position },
-    Knight { color: TeamColor, position: Position },
-    Rook { color: TeamColor, position: Position },
+pub struct Piece {
+    color: TeamColor,
+    position: Position,
+    kind: PieceType,
+    moves: Vec<MoveList>,
 }
 
 impl Piece {
     // get color name
-    pub fn get_color(self) -> TeamColor {
-        match self {
-            Piece::King { color, position: _ } => color,
-            Piece::Queen { color, position: _ } => color,
-            Piece::Pawn { color, position: _ } => color,
-            Piece::Bishop { color, position: _ } => color,
-            Piece::Knight { color, position: _ } => color,
-            Piece::Rook { color, position: _ } => color,
-        }
+    pub fn get_color<'a>(&'a self) -> &'a TeamColor {
+        &self.color
     }
 
     // get position
-    pub fn get_position(self) -> Position {
-        match self {
-            Piece::King { color: _, position } => position,
-            Piece::Queen { color: _, position } => position,
-            Piece::Pawn { color: _, position } => position,
-            Piece::Bishop { color: _, position } => position,
-            Piece::Knight { color: _, position } => position,
-            Piece::Rook { color: _, position } => position,
-        }
+    pub fn get_position<'a>(&'a self) -> &'a Position {
+        &self.position
     }
 
     // get material value
-    pub fn get_value(self) -> i16 {
-        match self {
-            Piece::King { .. } => 100,
-            Piece::Queen { .. } => 9,
-            Piece::Pawn { .. } => 1,
-            Piece::Bishop { .. } => 3,
-            Piece::Knight { .. } => 3,
-            Piece::Rook { .. } => 5,
+    pub fn get_value(&self) -> i16 {
+        match self.kind {
+            PieceType::King => 100,
+            PieceType::Queen => 9,
+            PieceType::Pawn => 1,
+            PieceType::Bishop => 3,
+            PieceType::Knight => 3,
+            PieceType::Rook => 5,
         }
     }
 
     // get moveset for each piece
-    pub fn get_moveset(self) {
-        match self {
-            Piece::King { .. } => (),
-            Piece::Queen { .. } => (),
-            Piece::Pawn { .. } => (),
-            Piece::Bishop { .. } => (),
-            Piece::Knight { .. } => (),
-            Piece::Rook { .. } => (),
-        }
-    }
+    pub fn get_moveset(&self) {}
 
     // piece type functions
-    pub fn is_king(self) -> bool {
-        match self {
-            Piece::King { .. } => true,
-            _ => false,
-        }
+    pub fn is_king(&self) -> bool {
+        self.kind == PieceType::King
     }
 
-    pub fn is_queen(self) -> bool {
-        match self {
-            Piece::Queen { .. } => true,
-            _ => false,
-        }
+    pub fn is_queen(&self) -> bool {
+        self.kind == PieceType::Queen
     }
 
-    pub fn is_pawn(self) -> bool {
-        match self {
-            Piece::Pawn { .. } => true,
-            _ => false,
-        }
+    pub fn is_pawn(&self) -> bool {
+        self.kind == PieceType::Pawn
     }
 
-    pub fn is_bishop(self) -> bool {
-        match self {
-            Piece::Bishop { .. } => true,
-            _ => false,
-        }
+    pub fn is_bishop(&self) -> bool {
+        self.kind == PieceType::Bishop
     }
 
-    pub fn is_knight(self) -> bool {
-        match self {
-            Piece::Knight { .. } => true,
-            _ => false,
-        }
+    pub fn is_knight(&self) -> bool {
+        self.kind == PieceType::Knight
     }
 
-    pub fn is_rook(self) -> bool {
-        match self {
-            Piece::Rook { .. } => true,
-            _ => false,
-        }
+    pub fn is_rook(&self) -> bool {
+        self.kind == PieceType::Rook
     }
 
     //
 
-    // pub fn get_moves(self) -> Vec<Vec<MoveList>> {
+    // pub fn get_moves(&self) -> Vec<Vec<MoveList>> {
 
     // }
 
-    pub fn get_valid_moves(self) {
+    pub fn get_valid_moves(&self) {
         //    let moves = self.get_moves();
     }
 
-    pub fn can_move(self, id: i16) -> bool {
+    pub fn can_move(&self, id: i16) -> bool {
         // check if tile is one of the possible moves in Piece.get_moves
         false
     }
+}
+
+#[derive(PartialEq)]
+pub enum PieceType {
+    King,
+    Queen,
+    Pawn,
+    Bishop,
+    Knight,
+    Rook,
+}
+
+impl PieceType {
+    pub fn get_valid_moves(&self) {}
 }
 
 struct MoveList {
