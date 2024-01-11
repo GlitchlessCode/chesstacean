@@ -85,7 +85,7 @@ impl From<(InactiveGame, PlayerInterface)> for Game<PlayerTurn> {
             black,
             white,
 
-            board: Board {}, // TODO: Use value.config.starting_fen here
+            board: Board::new(value.config.starting_fen, value.config.height, value.config.width),
             move_history: vec![],
 
             messenger: value.messenger,
@@ -276,6 +276,9 @@ pub struct GameConfig {
 
     starting_fen: String,
 
+    width: u8,
+    height: u8,
+
     time: TimeConfig,
 }
 
@@ -289,6 +292,8 @@ impl Default for GameConfig {
                 limit: Duration::from_secs(600),
                 added: Duration::from_secs(5),
             },
+            width: 8,
+            height: 8,
         }
     }
 }
