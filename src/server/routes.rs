@@ -1,6 +1,6 @@
 use http::{Response, StatusCode};
 use rand::{thread_rng, Rng};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
@@ -194,9 +194,7 @@ async fn log_in(
     };
 
     if let UserInfo::User { .. } = user_info {
-        return Ok(error_message(format!(
-            r#"{{"message":"Cannot log in while in an active session","affects":null}}"#
-        )));
+        return Ok(error_message("Cannot log in while in an active session", Affects::Null));
     }
 
     let Login { handle, password } = data;
@@ -222,9 +220,10 @@ async fn log_in(
         }
         Ok(ok) => {
             if !ok {
-                return Ok(error_message(format!(
-                    r#"{{"message":"ValidationError: Username or password is not valid","affects":"null"}}"#
-                )));
+                return Ok(error_message(
+                    "ValidationError: Username or password is not valid",
+                    Affects::Null,
+                ));
             }
         }
     }
@@ -243,9 +242,7 @@ async fn log_out(
     };
 
     if let UserInfo::Guest { .. } = user_info {
-        return Ok(error_message(format!(
-            r#"{{"message":"Cannot log out of guest session","affects":null}}"#
-        )));
+        return Ok(error_message("Cannot log out of guest session", Affects::Null));
     }
 
     let func = move |db: &Database| DatabaseResult::from(db.sessions().end_session(&cookie));
@@ -280,19 +277,20 @@ async fn sign_up(
     };
 
     if let UserInfo::User { .. } = user_info {
-        return Ok(error_message(format!(
-            r#"{{"message":"Cannot sign up while in an active session","affects":null}}"#
-        )));
+        return Ok(error_message(
+            "Cannot sign up while in an active session",
+            Affects::Null,
+        ));
     }
 
     if let Err(e) = validate_handle(&data.handle) {
-        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"handle"}}"#)));
+        return Ok(error_message(format!("{e}"), Affects::Handle));
     }
     if let Err(e) = validate_display(&data.display) {
-        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"display"}}"#)));
+        return Ok(error_message(format!("{e}"), Affects::Display));
     }
     if let Err(e) = validate_password(&data.password) {
-        return Ok(error_message(format!(r#"{{"message":"{e}","affects":"password"}}"#)));
+        return Ok(error_message(format!("{e}"), Affects::Password));
     }
 
     let SignUp {
@@ -325,9 +323,7 @@ async fn sign_up(
         }
         Ok(ok) => {
             if !ok {
-                return Ok(error_message(format!(
-                    r#"{{"message":"UniquenessError: Handle must be unique","affects":"handle"}}"#
-                )));
+                return Ok(error_message("UniquenessError: Handle must be unique", Affects::Handle));
             }
         }
     }
@@ -378,15 +374,24 @@ struct Login {
     password: String,
 }
 
-fn error_message(msg: impl ToString) -> Response<String> {
+fn error_message(msg: impl ToString, affects: Affects) -> Response<String> {
     let ser = serde_json::to_string(&Message::Error {
-        context: msg.to_string(),
+        message: msg.to_string(),
+        affects,
     });
 
     match ser {
         Ok(msg) => Response::builder().status(400).body(msg).unwrap(),
         Err(_) => server_error("Could not serialize error message"),
     }
+}
+
+#[derive(Serialize)]
+enum Affects {
+    Null,
+    Handle,
+    Display,
+    Password,
 }
 
 fn server_error(msg: impl ToString) -> Response<String> {

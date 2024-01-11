@@ -2,11 +2,12 @@ use std::{sync::Arc, time::Duration};
 
 use futures_util::{Future, FutureExt};
 use rand::{seq::SliceRandom, thread_rng};
+use serde::{Deserialize, Serialize};
 use tokio::{sync::broadcast, time::sleep};
 
 use self::{
     board::Board,
-    network::{ApprovedChatMessage, MessageInterface, PlayerInterface},
+    network::{ActionInterface, ApprovedChatMessage, MessageInterface, PlayerInterface},
     pieces::ValidMove,
 };
 
@@ -22,7 +23,9 @@ pub struct Game<S> {
     board: board::Board,
     move_history: Vec<ValidMove>,
 
-    messenger: Arc<MessageInterface>,
+    actions: ActionInterface,
+
+    pub messenger: Arc<MessageInterface>,
 
     state: S,
 }
@@ -34,18 +37,21 @@ impl<S> Game<S> {
 }
 
 pub struct InactiveGame {
-    white_starts: bool,
+    config: GameConfig,
     player1: PlayerInterface,
 
-    messenger: Arc<MessageInterface>,
+    actions: ActionInterface,
+
+    pub messenger: Arc<MessageInterface>,
 }
 
 impl InactiveGame {
-    pub fn new(interface: PlayerInterface, white_starts: bool /*, fen: String */) -> Self {
+    pub fn new(interface: PlayerInterface, actions: ActionInterface, config: GameConfig) -> Self {
         Self {
-            white_starts,
+            config,
             player1: interface,
             messenger: MessageInterface::create(),
+            actions,
         }
     }
 
@@ -56,24 +62,38 @@ impl InactiveGame {
 
 impl From<(InactiveGame, PlayerInterface)> for Game<PlayerTurn> {
     fn from((value, player2): (InactiveGame, PlayerInterface)) -> Self {
-        let rand: &'static bool = [true, false].choose(&mut thread_rng()).unwrap();
+        // TODO: Add timed games
+        // match value.config.time {
+        //     TimeConfig::NotTimed => (),
+        //     TimeConfig::Timed { limit, added } => (),
+        // }
 
-        let (black, white) = match rand {
-            &true => (value.player1, player2),
-            &false => (player2, value.player1),
+        let (black, white) = match value.config.player1_color {
+            TeamConfig::White => (player2, value.player1),
+            TeamConfig::Black => (value.player1, player2),
+            TeamConfig::Random => {
+                let rand: &'static bool = [true, false].choose(&mut thread_rng()).unwrap();
+
+                match rand {
+                    &true => (value.player1, player2),
+                    &false => (player2, value.player1),
+                }
+            }
         };
 
         Self {
             black,
             white,
 
-            board: Board {},
+            board: Board::new(value.config.starting_fen, value.config.height, value.config.width),
             move_history: vec![],
 
             messenger: value.messenger,
 
+            actions: value.actions,
+
             state: PlayerTurn {
-                turn: match value.white_starts {
+                turn: match value.config.white_starts {
                     true => Turn::White,
                     false => Turn::Black,
                 },
@@ -133,6 +153,8 @@ impl From<Game<PlayerTurn>> for Game<Calculating> {
 
             messenger: value.messenger,
 
+            actions: value.actions,
+
             state: Calculating {
                 last_turn: value.state.turn,
             },
@@ -162,6 +184,8 @@ impl From<Game<Calculating>> for Game<PlayerTurn> {
 
             messenger: value.messenger,
 
+            actions: value.actions,
+
             state: PlayerTurn {
                 turn: value.state.last_turn.switch(),
             },
@@ -178,6 +202,8 @@ impl From<(Game<Calculating>, Winner, EndState)> for Game<Ended> {
             move_history: value.0.move_history,
 
             messenger: value.0.messenger,
+
+            actions: value.0.actions,
 
             state: Ended {
                 winner: value.1,
@@ -243,13 +269,44 @@ struct Ended {
     state: EndState,
 }
 
-// pub enum GameStatus {
-//     NotStarted,
-//     Ongoing,
-//     BlackResigned,
-//     BlackCheckmated,
-//     WhiteResigned,
-//     WhiteCheckmated,
-//     Stalemate,
-//     DrawAccepted,
-// }
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GameConfig {
+    white_starts: bool,
+    player1_color: TeamConfig,
+
+    starting_fen: String,
+
+    width: u8,
+    height: u8,
+
+    time: TimeConfig,
+}
+
+impl Default for GameConfig {
+    fn default() -> Self {
+        Self {
+            white_starts: true,
+            player1_color: TeamConfig::Random,
+            starting_fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR".to_string(),
+            time: TimeConfig::Timed {
+                limit: Duration::from_secs(600),
+                added: Duration::from_secs(5),
+            },
+            width: 8,
+            height: 8,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum TimeConfig {
+    NotTimed,
+    Timed { limit: Duration, added: Duration },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum TeamConfig {
+    White,
+    Black,
+    Random,
+}

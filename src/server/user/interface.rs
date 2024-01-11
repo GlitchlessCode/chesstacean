@@ -1,19 +1,22 @@
 use std::{error::Error, fmt::Display};
 
 use crate::chess::game::{
-    network::{Action, ApprovedChatMessage, ChatMessage},
+    network::{Action, ApprovedChatMessage, ChatMessage, Event},
     pieces::Move,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-pub struct GameInterface {
-    move_target: mpsc::Receiver<oneshot::Sender<(Move, oneshot::Sender<bool>)>>,
-    action_target: watch::Receiver<mpsc::Sender<Action>>,
+type MoveRx = mpsc::Receiver<oneshot::Sender<(Move, oneshot::Sender<bool>)>>;
 
-    // move_recv: broadcast::Receiver<>
-    // action_recv: mpsc::Receiver<>
+#[derive(Debug)]
+pub struct GameInterface {
+    move_target: MoveRx,
+    action_target: watch::Receiver<Option<mpsc::Sender<Action>>>,
+
+    event_rx: mpsc::Receiver<Event>,
+
     message_target: mpsc::Sender<ChatMessage>,
-    message_recv: broadcast::Receiver<ApprovedChatMessage>,
+    message_rx: broadcast::Receiver<ApprovedChatMessage>,
 }
 
 impl GameInterface {
@@ -34,6 +37,22 @@ impl GameInterface {
         match result {
             true => Ok(()),
             false => Err(InterfaceError::InvalidMove),
+        }
+    }
+
+    pub fn new(
+        move_target: MoveRx,
+        action_target: watch::Receiver<Option<mpsc::Sender<Action>>>,
+        event_rx: mpsc::Receiver<Event>,
+        message_target: mpsc::Sender<ChatMessage>,
+        message_rx: broadcast::Receiver<ApprovedChatMessage>,
+    ) -> Self {
+        Self {
+            move_target,
+            action_target,
+            event_rx,
+            message_target,
+            message_rx,
         }
     }
 }

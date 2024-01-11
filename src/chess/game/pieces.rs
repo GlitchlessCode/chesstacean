@@ -1,110 +1,78 @@
-use std::rc::Weak;
-use std::sync::Arc;
+use std::ops::Add;
+use std::sync::{Arc, Weak};
 
 use serde::{Deserialize, Serialize};
 
-pub enum Piece {
-    King { color: TeamColor, position: Position },
-    Queen { color: TeamColor, position: Position },
-    Pawn { color: TeamColor, position: Position },
-    Bishop { color: TeamColor, position: Position },
-    Knight { color: TeamColor, position: Position },
-    Rook { color: TeamColor, position: Position },
+pub struct Piece {
+    color: TeamColor,
+    position: Position,
+    kind: PieceType,
+    moves: Vec<MoveList>,
 }
 
 impl Piece {
-    // get color name
-    pub fn get_color(self) -> TeamColor {
-        match self {
-            Piece::King { color, position: _ } => color,
-            Piece::Queen { color, position: _ } => color,
-            Piece::Pawn { color, position: _ } => color,
-            Piece::Bishop { color, position: _ } => color,
-            Piece::Knight { color, position: _ } => color,
-            Piece::Rook { color, position: _ } => color,
+    pub fn new(color: TeamColor, position: Position, kind: PieceType) -> Self {
+        Self {
+            color,
+            position,
+            kind,
+            moves: vec![],
         }
+    }
+
+    // get color name
+    pub fn get_color<'a>(&'a self) -> &'a TeamColor {
+        &self.color
     }
 
     // get position
-    pub fn get_position(self) -> Position {
-        match self {
-            Piece::King { color: _, position } => position,
-            Piece::Queen { color: _, position } => position,
-            Piece::Pawn { color: _, position } => position,
-            Piece::Bishop { color: _, position } => position,
-            Piece::Knight { color: _, position } => position,
-            Piece::Rook { color: _, position } => position,
-        }
+    pub fn get_position<'a>(&'a self) -> &'a Position {
+        &self.position
     }
 
     // get material value
-    pub fn get_value(self) -> i16 {
-        match self {
-            Piece::King { .. } => 100,
-            Piece::Queen { .. } => 9,
-            Piece::Pawn { .. } => 1,
-            Piece::Bishop { .. } => 3,
-            Piece::Knight { .. } => 3,
-            Piece::Rook { .. } => 5,
+    pub fn get_value(&self) -> i16 {
+        match self.kind {
+            PieceType::King => 100,
+            PieceType::Queen => 9,
+            PieceType::Pawn => 1,
+            PieceType::Bishop => 3,
+            PieceType::Knight => 3,
+            PieceType::Rook => 5,
         }
     }
 
     // get moveset for each piece
-    pub fn get_moveset(self) -> FullMoveset {
-        match self {
-            Piece::King { .. } => FullMoveset{moves: vec![Moveset{x_modifier: -1, y_modifier: 1}, Moveset{x_modifier: 0, y_modifier: 1}, Moveset{x_modifier: 1, y_modifier: 1}, Moveset{x_modifier: -1, y_modifier: 0}, Moveset{x_modifier: 1, y_modifier: 0}, Moveset{x_modifier: -1, y_modifier: -1}, Moveset{x_modifier: 0, y_modifier: -1}, Moveset{x_modifier: 1, y_modifier: -1}] , iterative: false},
-            Piece::Queen { .. } => FullMoveset{moves: vec![Moveset{x_modifier: -1, y_modifier: 1}, Moveset{x_modifier: 0, y_modifier: 1}, Moveset{x_modifier: 1, y_modifier: 1}, Moveset{x_modifier: -1, y_modifier: 0}, Moveset{x_modifier: 1, y_modifier: 0}, Moveset{x_modifier: -1, y_modifier: -1}, Moveset{x_modifier: 0, y_modifier: -1}, Moveset{x_modifier: 1, y_modifier: -1}] , iterative: true},
-            Piece::Pawn { .. } => FullMoveset{moves: vec![Moveset{x_modifier: 0, y_modifier: -1}], iterative: false},
-            Piece::Bishop { .. } => FullMoveset{moves: vec![Moveset{x_modifier: -1, y_modifier: -1}, Moveset{x_modifier: 1, y_modifier: 1}, Moveset{x_modifier: 1, y_modifier: -1}, Moveset{x_modifier: -1, y_modifier: 1}] , iterative: true},
-            Piece::Knight { .. } => FullMoveset{moves: vec![Moveset{x_modifier: 2, y_modifier: 1}, Moveset{x_modifier: 1, y_modifier: 2}, Moveset{x_modifier: -1, y_modifier: 2}, Moveset{x_modifier: -2, y_modifier: 1}, Moveset{x_modifier: -2, y_modifier: -1}, Moveset{x_modifier: -1, y_modifier: -2}, Moveset{x_modifier: 1, y_modifier: -2}, Moveset{x_modifier: 2, y_modifier: -1}] , iterative: false},
-            Piece::Rook { .. } => FullMoveset{moves: vec![Moveset{x_modifier: -1, y_modifier: 0}, Moveset{x_modifier: 1, y_modifier: 0}, Moveset{x_modifier: 0, y_modifier: -1}, Moveset{x_modifier: 0, y_modifier: 1}], iterative: true},
-        }
+    pub fn get_moveset(&self) -> FullMoveset {
+        self.kind.get_moveset()
     }
 
     // piece type functions
-    pub fn is_king(self) -> bool {
-        match self {
-            Piece::King { .. } => true,
-            _ => false,
-        }
+    pub fn is_king(&self) -> bool {
+        self.kind == PieceType::King
     }
 
-    pub fn is_queen(self) -> bool {
-        match self {
-            Piece::Queen { .. } => true,
-            _ => false,
-        }
+    pub fn is_queen(&self) -> bool {
+        self.kind == PieceType::Queen
     }
 
-    pub fn is_pawn(self) -> bool {
-        match self {
-            Piece::Pawn { .. } => true,
-            _ => false,
-        }
+    pub fn is_pawn(&self) -> bool {
+        self.kind == PieceType::Pawn
     }
 
-    pub fn is_bishop(self) -> bool {
-        match self {
-            Piece::Bishop { .. } => true,
-            _ => false,
-        }
+    pub fn is_bishop(&self) -> bool {
+        self.kind == PieceType::Bishop
     }
 
-    pub fn is_knight(self) -> bool {
-        match self {
-            Piece::Knight { .. } => true,
-            _ => false,
-        }
+    pub fn is_knight(&self) -> bool {
+        self.kind == PieceType::Knight
     }
 
-    pub fn is_rook(self) -> bool {
-        match self {
-            Piece::Rook { .. } => true,
-            _ => false,
-        }
+    pub fn is_rook(&self) -> bool {
+        self.kind == PieceType::Rook
     }
 
-    // pub fn get_all_moves(self) -> Vec<Vec<MoveList>> {
+    // pub fn get_all_moves(&self) -> Vec<Vec<MoveList>> {
     //     // get movelists for every piece
     // }
 
@@ -112,12 +80,10 @@ impl Piece {
         // get movelists for specific piece
         let moveset = self.get_moveset();
         let all_moves: Vec<MoveList> = Vec::new();
-        let piece_position: Position = self.get_position();
+        let piece_position: &Position = self.get_position();
 
         for moveset_list in moveset.moves {
-            let new_position = 
-
-            if moveset.iterative == false {
+            let new_position = if moveset.iterative == false {
                 break;
             };
         }
@@ -129,12 +95,189 @@ impl Piece {
         //    let moves = self.get_all_moves();
     }
 
-    
-
-    pub fn can_move(self, id: i16) -> bool {
+    pub fn can_move(&self, id: i16) -> bool {
         // check if tile is one of the possible moves in Piece.get_valid_moves
         false
     }
+}
+
+#[derive(PartialEq)]
+pub enum PieceType {
+    King,
+    Queen,
+    Pawn,
+    Bishop,
+    Knight,
+    Rook,
+}
+
+impl PieceType {
+    pub fn get_moveset(&self) -> FullMoveset {
+        match self {
+            PieceType::King { .. } => FullMoveset {
+                moves: vec![
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: -1,
+                    },
+                ],
+                iterative: false,
+            },
+            PieceType::Queen { .. } => FullMoveset {
+                moves: vec![
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: -1,
+                    },
+                ],
+                iterative: true,
+            },
+            PieceType::Pawn { .. } => FullMoveset {
+                moves: vec![Moveset {
+                    x_modifier: 0,
+                    y_modifier: -1,
+                }],
+                iterative: false,
+            },
+            PieceType::Bishop { .. } => FullMoveset {
+                moves: vec![
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 1,
+                    },
+                ],
+                iterative: true,
+            },
+            PieceType::Knight { .. } => FullMoveset {
+                moves: vec![
+                    Moveset {
+                        x_modifier: 2,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 2,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 2,
+                    },
+                    Moveset {
+                        x_modifier: -2,
+                        y_modifier: 1,
+                    },
+                    Moveset {
+                        x_modifier: -2,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: -2,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: -2,
+                    },
+                    Moveset {
+                        x_modifier: 2,
+                        y_modifier: -1,
+                    },
+                ],
+                iterative: false,
+            },
+            PieceType::Rook { .. } => FullMoveset {
+                moves: vec![
+                    Moveset {
+                        x_modifier: -1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: 1,
+                        y_modifier: 0,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: -1,
+                    },
+                    Moveset {
+                        x_modifier: 0,
+                        y_modifier: 1,
+                    },
+                ],
+                iterative: true,
+            },
+        }
+    }
+
+    pub fn get_valid_moves(&self) {}
 }
 
 struct MoveList {
@@ -155,7 +298,7 @@ struct FullMoveset {
 
 struct Moveset {
     x_modifier: i16,
-    y_modifier: i16
+    y_modifier: i16,
 }
 
 enum Progress<T> {
@@ -168,20 +311,33 @@ pub enum TeamColor {
     Black,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Position {
     pub x: u16,
     pub y: u16,
 }
 
 impl Position {
-    pub fn add_moveset_to_position(self, moveset: Moveset) -> Position {
-        // don't know why this can't find function???
-        Position {x: self.add_u16_to_i16(self.x, moveset.x_modifier, y), y: self.add_u16_to_i16(self.x, moveset.y_modifier)}
+    pub fn add_i16_to_u16(u16: u16, i16: i16) -> Option<u16> {
+        let result = u16 as i16 + i16 as i16;
+        if result < 0 {
+            None
+        } else {
+            Some(result as u16)
+        }
     }
+}
 
-    pub fn add_i16_to_u16(u16: u16, i16: i16) -> u16 {
-        (u16 as i16 + i16 as i16) as u16
+impl Add<Moveset> for &Position {
+    type Output = Option<Position>;
+    fn add(self, rhs: Moveset) -> Self::Output {
+        let x = Position::add_i16_to_u16(self.x, rhs.x_modifier);
+        let y = Position::add_i16_to_u16(self.y, rhs.y_modifier);
+        if let (Some(x), Some(y)) = (x, y) {
+            Some(Position { x, y })
+        } else {
+            None
+        }
     }
 }
 

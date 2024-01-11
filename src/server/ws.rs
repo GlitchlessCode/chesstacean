@@ -12,8 +12,9 @@ use warp::{
 };
 
 use crate::chess::game::{
-    network::{Action, ApprovedChatMessage, ChatMessage},
+    network::{ActionType, ApprovedChatMessage},
     pieces::Move,
+    GameConfig,
 };
 
 static ID: AtomicU64 = AtomicU64::new(0);
@@ -55,7 +56,7 @@ impl Connection {
             Some(Err(e)) => ListenerResult::Error(e),
             Some(Ok(m)) => {
                 if m.is_text() {
-                    ListenerResult::Message(m)
+                    ListenerResult::Text(m.to_str().unwrap().to_string())
                 } else {
                     ListenerResult::Ignore
                 }
@@ -63,7 +64,7 @@ impl Connection {
         }
     }
 
-    pub async fn send(&self, msg: impl Serialize) {
+    pub async fn send_serde(&self, msg: impl Serialize) {
         let text = match serde_json::to_string(&msg) {
             Ok(s) => s,
             Err(e) => {
@@ -72,15 +73,23 @@ impl Connection {
             }
         };
         let mut writer = self.sink.write().await;
-        match (*writer).send(Message::text(text)).await {
+        match writer.send(Message::text(text)).await {
             Ok(_) => (),
             Err(e) => eprint!("\rFailed to send message because of error: {e}\n > "),
         };
     }
+
+    pub async fn send(&self, msg: &String) {
+        let mut writer = self.sink.write().await;
+        match writer.send(Message::text(msg)).await {
+            Ok(_) => (),
+            Err(e) => eprint!("\rFailed to send message because of error: {e}\n > "),
+        }
+    }
 }
 
 pub enum ListenerResult {
-    Message(Message),
+    Text(String),
     Error(Error),
     Disconnected(u64),
     Ignore,
@@ -88,33 +97,95 @@ pub enum ListenerResult {
 
 #[derive(Serialize)]
 pub enum SentMessage {
-    Error { context: String },
-    Connected { display: String },
-    GameEvent { event: GameEvent },
+    // * Status
+    WsError { context: String },
+    WsConnected { display: String },
+
+    // * Control Events
+    WsEvent { event: ControlEvent },
+
+    // * In game
+    WsGameEvent { event: GameEvent },
 }
 
 impl SentMessage {
     pub fn error(context: impl ToString) -> Self {
-        Self::Error {
+        Self::WsError {
             context: context.to_string(),
         }
     }
 }
 
+impl From<ControlEvent> for SentMessage {
+    fn from(event: ControlEvent) -> Self {
+        Self::WsEvent { event }
+    }
+}
+
+impl From<GameEvent> for SentMessage {
+    fn from(event: GameEvent) -> Self {
+        Self::WsGameEvent { event }
+    }
+}
+
 #[derive(Serialize)]
 pub enum GameEvent {
+    GameStart { code: String },
     Message { msg: ApprovedChatMessage },
+}
+
+#[derive(Serialize)]
+pub enum ControlEvent {
+    // * Host responses
+    LobbyCreated { code: String },
+    LobbyClosed { code: String },
+
+    // * Client responses
+    JoinedLobby { code: String },
+    LeftLobby { code: String },
+
+    // * Lobby Starting
+    LobbyStarted { code: String },
+
+    // * Matchmaking responses
+    JoinedQueue,
+    LeftQueue,
+
+    // * Spectators
+    JoinedAsSpectator { code: String },
 }
 
 #[derive(Deserialize)]
 pub enum RecievedMessage {
-    Join,
+    // * Ingame controls
     GameAction { action: GameAction },
+
+    // * Out of game controls
+    ControlAction { action: ControlAction },
+}
+
+#[derive(Deserialize)]
+pub enum ControlAction {
+    // * Host controls
+    CreateLobby,
+    CloseLobby { code: String },
+    StartLobby { config: GameConfig },
+
+    // * Client controls
+    JoinLobby { code: String },
+    LeaveLobby { code: String },
+
+    // * Matchmaking controls
+    JoinQueue,
+    LeaveQueue,
+
+    // * Spectators
+    JoinAsSpectator { code: String },
 }
 
 #[derive(Deserialize)]
 pub enum GameAction {
-    Message { msg: ChatMessage },
+    Message { msg: String },
     Turn { turn: Move },
-    Action { action: Action },
+    Action { action: ActionType },
 }

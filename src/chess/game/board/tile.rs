@@ -1,12 +1,7 @@
-use crate::chess::game::pieces::{self, Position};
+use crate::chess::game::pieces;
 
 pub enum Tile {
-    Piece {
-        piece: pieces::Piece, // Box<dyn Piece>
-                              // [...]
-    },
-    Empty {
-        position: Position
-    },
+    Piece { piece: pieces::Piece },
+    Empty,
     Wall,
 }
