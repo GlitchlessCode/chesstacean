@@ -155,8 +155,8 @@ function update() {
 	canvas.ctx.font      = font;
 	canvas.ctx.fillStyle = "#DDDDDD";
 
-	canvas.ctx.align    = "left";
-	canvas.ctx.baseline = "top";
+	canvas.ctx.textAlign    = "left";
+	canvas.ctx.textBaseline = "top";
 
 	const numberingX = board.left + labelMargin;
 
@@ -169,8 +169,8 @@ function update() {
 
 	// horizontal numbering
 
-	canvas.ctx.align    = "right";
-	canvas.ctx.baseline = "bottom";
+	canvas.ctx.textAlign    = "right";
+	canvas.ctx.textBaseline = "bottom";
 
 	const letteringY = board.bottom - labelMargin;
 

@@ -1,6 +1,6 @@
 "use strict";
 
-const DEFAULT_GRID_WIDTH  = 26;
+const DEFAULT_GRID_WIDTH  = 12;
 const DEFAULT_GRID_HEIGHT = 8;
 
 /**

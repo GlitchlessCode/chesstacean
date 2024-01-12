@@ -43,7 +43,7 @@ canvas.rect = function(point, width, height) {
 	this.ctx.fill();
 };
 
-canvas.text = function(text) {
+canvas.text = function(text, x, y) {
 	this.ctx.fillText(text, x, y);
 };
 
@@ -110,6 +110,8 @@ addEventListener("mouseup", () => canvas.dragging = false);
 window.addEventListener("resize", () => {
 	canvas.cnv.width  = Math.floor(canvas.cnv.getBoundingClientRect().width );
 	canvas.cnv.height = Math.floor(canvas.cnv.getBoundingClientRect().height);
+
+	requestAnimationFrame(update);
 });
 
 window.dispatchEvent(new Event("resize"));
