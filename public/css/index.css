@@ -226,11 +226,6 @@ main > div.bottomleft > div.card-container > div.card:last-child {
 	margin-bottom: 64px;
 }
 
-main > div.bottomleft > div.card-container > div.card.inactive div.icon-container,
-main > div.bottomleft > div.card-container > div.card.inactive div.info-container {
-	filter: brightness(50%);
-}
-
 main > div.bottomleft > div.card-container > div.card > div.icon-container {
 	width: min-content;
 	height: min-content;

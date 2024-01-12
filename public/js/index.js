@@ -1,8 +1,5 @@
 "use strict";
 
-// board layout in fen notation
-const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
-
 let maxOffsetX = 0;
 let maxOffsetY = 0;
 let firstRender = true;
@@ -117,33 +114,14 @@ function update() {
 
 	// draw pieces
 
-	// some pieces dont draw without this anonymous function usage for some reason...
+	board.rows.forEach((row, rowIndex) => {
+		row.forEach((image, colIndex) => {
+			const x = board.left + colIndex * board.tilesize;
+			const y = board.top  + rowIndex * board.tilesize;
 
-	(() => {
-		let row = 0;
-		let col = 0;
-
-		Array.from(fen).forEach(character => {
-			if (character === '/') {
-				row++;
-				col = 0;
-
-				return;
-			}
-
-			if (Number.isInteger(+character)) {
-				col += +character;
-				return;
-			}
-
-			const x = board.left + col * board.tilesize;
-			const y = board.top  + row * board.tilesize;
-
-			canvas.image(pieces[character], x, y, board.tilesize, board.tilesize);
-
-			col++;
+			canvas.image(image, x, y, board.tilesize, board.tilesize);
 		});
-	})();
+	});
 
 	// draw numbering and lettering
 
@@ -187,5 +165,3 @@ function update() {
 		requestAnimationFrame(update);
 	}
 }
-
-requestAnimationFrame(update);
