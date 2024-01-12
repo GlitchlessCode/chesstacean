@@ -142,7 +142,7 @@ function serialize(obj) {
   if (!validate_tokens(tokens.unwrap()))
     return Err(new SerdeError("Serialized result must be a valid Token tree"));
 
-  return Ok(detokenize(tokens));
+  return Ok(detokenize(tokens.unwrap()));
 }
 
 /**
@@ -309,7 +309,7 @@ function tokenize(json) {
   return Ok(tokens);
 }
 
-const valid_token = /[a-zA-Z0-9_]/;
+const valid_token = /[a-zA-Z0-9_ ]/;
 /**
  * @param {StrIter} json
  * @returns {Result<string, SerdeError>}

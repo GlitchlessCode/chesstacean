@@ -168,7 +168,6 @@ class And extends Definition {
   match(tokens) {
     const results = [this.#first.match(tokens), this.#second.match(tokens)];
     const errs = results.filter((r) => r.is_err()).map((e) => e.unwrap_err());
-    console.log(this.count, tokens.length);
     if (this.count !== tokens.length) {
       return Err(new ParseError("Incorrect Token Count", ...errs));
     } else if (errs.length !== 0) {
@@ -382,16 +381,14 @@ function define(name) {
   return new Named(name);
 }
 
-const context = define("context").capture_optional(Types.String);
-const status = define("status").with(
-  define("Success")
-    .with(context)
-    .xor(define("Failure").with(context))
-    .xor(define("Partial").with(context))
+const context = define("context").with(
+  define("message").capture(Types.String).and(define("affects").capture(Types.String))
 );
 
 const error = define("Error").with(context);
-const connected = define("Connected").with(define("display").capture(Types.String));
+
+const wserror = define("WsError").with(define("context").capture_optional(Types.String));
+const wsconnected = define("WsConnected").with(define("display").capture(Types.String));
 
 class Status {
   static Success = Symbol("Success");
@@ -438,20 +435,13 @@ class Status {
 }
 
 class Message {
-  static DEFINITIONS = error.xor(connected);
+  static DEFINITIONS = error.xor(wserror).xor(wsconnected);
 
   static Error = Symbol("Error");
-  static Connected = Symbol("Connected");
 
-  /**
-   * @typedef {{Error:{context:string}}} ErrorMsg
-   */
-  /**
-   * @typedef {{Connected:{display:string}}} ConnectedMsg
-   */
-  /**
-   * @param {ErrorMsg|ConnectedMsg} match
-   */
+  static WsError = Symbol("WsError");
+  static WsConnected = Symbol("WsConnected");
+
   static from(match) {
     switch (Object.keys(match)[0]) {
       case "Error": {
@@ -459,9 +449,14 @@ class Message {
         self.body.context = match.Error.context;
         return self;
       }
-      case "Connected": {
-        const self = new this(this.Connected);
-        self.body.display = match.Connected.display;
+      case "WsError": {
+        const self = new this(this.WsError);
+        self.body.context = match.WsError.context;
+        return self;
+      }
+      case "WsConnected": {
+        const self = new this(this.WsConnected);
+        self.body.display = match.WsConnected.display;
         return self;
       }
     }

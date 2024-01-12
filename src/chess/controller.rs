@@ -3,27 +3,39 @@ use super::game::{
     GameConfig, InactiveGame,
 };
 use crate::{
-    server::user::{interface::GameInterface, UserInfo},
+    server::{
+        database::{Database, DatabaseMessage, DatabaseResult},
+        user::{interface::GameInterface, UserInfo},
+    },
     traits::ChooseTake,
+    word_loader::WordList,
 };
-use rand::thread_rng;
+use anyhow::{bail, Result};
+use rand::rngs::OsRng;
 use std::{
     collections::{BTreeSet, HashMap},
+    error::Error,
+    fmt::Display,
     sync::Arc,
     time::Duration,
 };
 use tokio::{
-    sync::{oneshot, RwLock},
+    sync::{mpsc, oneshot, RwLock},
     time::{self, Instant},
 };
 
 pub struct GameControllerInterface {
     matchmaker: Arc<Matchmaker>,
     lobby_manager: RwLock<LobbyManager>,
+    active_game_codes: RwLock<Vec<String>>,
+
+    word_list: Arc<WordList>,
+
+    db_tx: mpsc::Sender<DatabaseMessage>,
 }
 // TODO: Convert a lot of the UserInfo parts to include Targets for transmission
 impl GameControllerInterface {
-    pub fn new() -> Arc<Self> {
+    pub fn new(word_list: WordList, db_tx: mpsc::Sender<DatabaseMessage>) -> Arc<Self> {
         let matchmaker = Matchmaker::new();
         Matchmaker::start(matchmaker.clone());
 
@@ -32,6 +44,12 @@ impl GameControllerInterface {
         Arc::new(Self {
             matchmaker,
             lobby_manager,
+
+            active_game_codes: RwLock::new(vec![]),
+
+            word_list: Arc::new(word_list),
+
+            db_tx,
         })
     }
 
@@ -42,13 +60,57 @@ impl GameControllerInterface {
         self.matchmaker.leave_queue(user).await
     }
 
-    pub async fn create_lobby(&self) {}
+    pub async fn create_lobby(&self, user: &UserInfo) -> Result<String> {
+        let id = loop {
+            let word = self.word_list.combo(&mut OsRng);
+
+            let result = {
+                let word = word.clone();
+                let func = move |db: &Database| DatabaseResult::from(db.games().game_exists(word));
+                DatabaseMessage::send(func, &self.db_tx).await?
+            };
+
+            let valid = match result {
+                DatabaseResult::ResultBool(rb) => rb?,
+                _ => bail!(ControllerError::InternalError),
+            };
+
+            if valid {
+                break word;
+            }
+        };
+
+        let mut writer = self.active_game_codes.write().await;
+        writer.push(id.clone());
+        drop(writer);
+
+        Ok(id)
+    }
     pub async fn close_lobby(&self) {}
     pub async fn start_lobby(&self) {}
 
     pub fn join_lobby(&self) {}
     pub fn leave_lobby(&self) {}
 }
+
+#[derive(Debug)]
+pub enum ControllerError {
+    InternalError,
+}
+
+impl Display for ControllerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ControllerError::InternalError => format!("InternalError: Ran into an unknown internal error"),
+            }
+        )
+    }
+}
+
+impl Error for ControllerError {}
 
 struct LobbyManager {
     codes: HashMap<String, Arc<Lobby>>,
@@ -152,10 +214,9 @@ impl Matchmaker {
     /// Currently does not implement any statistic analysis
     fn make_matches(queue: &mut Vec<UserInQueue>, in_queue: &mut BTreeSet<UserInfo>) {
         while queue.len() > 2 {
-            let mut rng = thread_rng();
             // Get random players
-            let player1 = queue.take_random(&mut rng).unwrap();
-            let player2 = queue.take_random(&mut rng).unwrap();
+            let player1 = queue.take_random(&mut OsRng).unwrap();
+            let player2 = queue.take_random(&mut OsRng).unwrap();
 
             in_queue.remove(&player1.user);
             in_queue.remove(&player2.user);

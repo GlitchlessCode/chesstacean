@@ -112,7 +112,7 @@ mod command {
                     String::new(),
                 ),
             };
-            write!(f, "CommandError: {name}\n{context}\n > {location} << Here")
+            write!(f, "CommandError: {name}\n{context}\n\n > {location} << Here")
         }
     }
 
@@ -390,7 +390,7 @@ mod arguments {
                     format!("{location}"),
                 ),
             };
-            write!(f, "ArgumentError: {name}\n{context}\n > {location} << Here")
+            write!(f, "ArgumentError: {name}\n{context}\n\n > {location} << Here")
         }
     }
 

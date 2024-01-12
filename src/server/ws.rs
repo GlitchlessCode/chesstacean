@@ -68,14 +68,14 @@ impl Connection {
         let text = match serde_json::to_string(&msg) {
             Ok(s) => s,
             Err(e) => {
-                eprint!("\rFailed to serialize message because of error: {e}\n > ");
+                eprint!("\rFailed to serialize message because of error: {e}\n\n > ");
                 return;
             }
         };
         let mut writer = self.sink.write().await;
         match writer.send(Message::text(text)).await {
             Ok(_) => (),
-            Err(e) => eprint!("\rFailed to send message because of error: {e}\n > "),
+            Err(e) => eprint!("\rFailed to send message because of error: {e}\n\n > "),
         };
     }
 
@@ -83,7 +83,7 @@ impl Connection {
         let mut writer = self.sink.write().await;
         match writer.send(Message::text(msg)).await {
             Ok(_) => (),
-            Err(e) => eprint!("\rFailed to send message because of error: {e}\n > "),
+            Err(e) => eprint!("\rFailed to send message because of error: {e}\n\n > "),
         }
     }
 }
@@ -164,7 +164,7 @@ pub enum RecievedMessage {
     ControlAction { action: ControlAction },
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum ControlAction {
     // * Host controls
     CreateLobby,
@@ -183,7 +183,7 @@ pub enum ControlAction {
     JoinAsSpectator { code: String },
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum GameAction {
     Message { msg: String },
     Turn { turn: Move },

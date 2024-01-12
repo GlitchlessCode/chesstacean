@@ -17,12 +17,15 @@ async fn main() {
     // Create mpsc for WebSockets
     let (ws_tx, ws_rx) = mpsc::channel(10);
 
+    // Create mpsc for DB
+    let (db_tx, db_rx) = mpsc::channel(10);
+
     // Create and start user registry thread
-    let user_registry = Registry::new();
+    let user_registry = Registry::new(words, &db_tx);
     tokio::task::spawn(Registry::start(user_registry.clone(), ws_rx, token_manager.clone()));
 
     // Create and start database thread, and session flusher
-    let (database, db_tx, flusher) = database::init(user_registry.clone());
+    let (database, flusher) = database::init(db_rx, &db_tx, user_registry.clone());
     tokio::task::spawn(database);
     tokio::task::spawn(flusher);
 

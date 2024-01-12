@@ -220,7 +220,7 @@ pub enum Event {
     ValidMove(ValidMove),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ActionType {
     OfferDraw,
     AcceptDraw,

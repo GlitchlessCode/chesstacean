@@ -35,7 +35,7 @@ pub trait Sender {
         let msg = match serde_json::to_string(&msg) {
             Ok(msg) => msg,
             Err(e) => {
-                return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n > ");
+                return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n\n > ");
             }
         };
         for conn in self.connections().await.values() {
@@ -59,8 +59,18 @@ impl UserConnection {
     pub async fn upgrade(&self, handle: impl ToString, display: impl ToString) -> Result<(), ()> {
         let read_info = self.info.read().await;
         if let UserInfo::Guest { .. } = *read_info {
+            let user = UserInfo::new_user(handle, display);
+
+            // Update Connection
             let mut write_info = self.info.write().await;
-            *write_info = UserInfo::new_user(handle, display);
+            *write_info = user.clone();
+            drop(write_info);
+
+            // Update Listener
+            let mut write_info = self.listener.info.write().await;
+            *write_info = user;
+            drop(write_info);
+
             Ok(())
         } else {
             Err(())
@@ -104,7 +114,12 @@ impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
     fn from((value, controller): (UserInfo, Arc<GameControllerInterface>)) -> Self {
         let (tx, rx) = mpsc::channel(2);
         let connections = ArcLock::new_arclock(HashMap::new());
-        let listener = Arc::new(ConnectionListener::new(Arc::clone(&connections), tx, controller));
+        let listener = Arc::new(ConnectionListener::new(
+            Arc::clone(&connections),
+            tx,
+            controller,
+            &value.clone(),
+        ));
         let this = Self {
             info: RwLock::new(value),
             connections,
@@ -120,6 +135,8 @@ struct ConnectionListener {
     targets: RwLock<HashMap<String, GameInterface>>,
     controller: Arc<GameControllerInterface>,
     interrupt: mpsc::Sender<()>,
+
+    info: RwLock<UserInfo>,
 }
 
 impl ConnectionListener {
@@ -155,17 +172,18 @@ impl ConnectionListener {
                         drop(hash_map)
                     }
                     ws::ListenerResult::Error(err) => {
-                        eprint!("\rNew Error: {err}\n > ");
+                        eprint!("\rNew Error: {err}\n\n > ");
                         self.send(SentMessage::error(
                             "The server experienced an error handling your request",
                         ))
                         .await;
                     }
                     ws::ListenerResult::Text(msg) => {
-                        eprint!("\rNew Message: {msg:?}\n > ");
+                        eprint!("\rNew Message: {msg:?}\n\n > ");
                         let result = serde_json::from_str::<'_, RecievedMessage>(&msg);
                         match result {
-                            Err(_) => {
+                            Err(err) => {
+                                eprint!("\rError deserializing request: {err}\n\n > ");
                                 self.send(SentMessage::error(
                                     "The server experienced an error handling your request",
                                 ))
@@ -186,12 +204,14 @@ impl ConnectionListener {
         connections: ArcLock<HashMap<String, SessionConnections>>,
         interrupt: mpsc::Sender<()>,
         controller: Arc<GameControllerInterface>,
+        info: &UserInfo,
     ) -> Self {
         Self {
             connections,
             targets: RwLock::new(HashMap::new()),
             interrupt,
             controller,
+            info: RwLock::new(info.clone()),
         }
     }
 
@@ -202,8 +222,24 @@ impl ConnectionListener {
 
     async fn handle_message(self: Arc<Self>, action: RecievedMessage) {
         match action {
-            RecievedMessage::ControlAction { action } => (),
-            RecievedMessage::GameAction { action } => (),
+            RecievedMessage::ControlAction { action } => {
+                use ws::ControlAction::*;
+                let controller = &self.controller;
+                match action {
+                    CreateLobby => {
+                        let reader = &self.info.read().await;
+                        let code = controller.create_lobby(&*reader).await;
+                    }
+                    _ => (),
+                }
+            }
+            RecievedMessage::GameAction { action } => {
+                use ws::GameAction::*;
+                match action {
+                    Turn { .. } => {}
+                    _ => (),
+                }
+            }
         }
     }
 }
@@ -244,7 +280,7 @@ impl SessionConnections {
                 if let Some(conn) = Arc::into_inner(conn) {
                     conn.close()
                         .await
-                        .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n > "));
+                        .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n\n > "));
                 }
                 return true;
             }
@@ -256,7 +292,7 @@ impl SessionConnections {
             if let Some(conn) = Arc::into_inner(conn) {
                 conn.close()
                     .await
-                    .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n > "));
+                    .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n\n > "));
             }
         }
     }
