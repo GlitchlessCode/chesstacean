@@ -1,10 +1,15 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, sync::Arc};
 
 use crate::chess::game::{
     network::{Action, ApprovedChatMessage, ChatMessage, Event},
     pieces::Move,
 };
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{
+    broadcast::{self, error::RecvError},
+    mpsc, oneshot, watch, RwLock,
+};
+
+use super::{Sender, UserConnection};
 
 type MoveRx = mpsc::Receiver<oneshot::Sender<(Move, oneshot::Sender<bool>)>>;
 
@@ -13,10 +18,12 @@ pub struct GameInterface {
     move_target: MoveRx,
     action_target: watch::Receiver<Option<mpsc::Sender<Action>>>,
 
-    event_rx: mpsc::Receiver<Event>,
+    event_rx: RwLock<mpsc::Receiver<Event>>,
+
+    code: String,
 
     message_target: mpsc::Sender<ChatMessage>,
-    message_rx: broadcast::Receiver<ApprovedChatMessage>,
+    message_rx: RwLock<broadcast::Receiver<ApprovedChatMessage>>,
 }
 
 impl GameInterface {
@@ -44,17 +51,54 @@ impl GameInterface {
         move_target: MoveRx,
         action_target: watch::Receiver<Option<mpsc::Sender<Action>>>,
         event_rx: mpsc::Receiver<Event>,
+        code: String,
         message_target: mpsc::Sender<ChatMessage>,
         message_rx: broadcast::Receiver<ApprovedChatMessage>,
-    ) -> Self {
-        Self {
+    ) -> Arc<Self> {
+        Arc::new(Self {
             move_target,
             action_target,
-            event_rx,
+            event_rx: RwLock::new(event_rx),
+            code,
             message_target,
-            message_rx,
+            message_rx: RwLock::new(message_rx),
+        })
+    }
+
+    pub fn start(self: Arc<Self>, conn: Arc<UserConnection>) {
+        tokio::task::spawn(GameInterface::run(Arc::clone(&self), conn));
+    }
+    async fn run(self: Arc<Self>, conn: Arc<UserConnection>) {
+        // These writers should never drop
+        let mut events = self.event_rx.write().await;
+        let mut messages = self.message_rx.write().await;
+        loop {
+            let result = tokio::select! {
+                e = events.recv() => {
+                    if let Some(e) = e {
+                        InterfaceResult::Event(e)
+                    } else {
+                        InterfaceResult::ChannelClose
+                    }
+                },
+                m = messages.recv() => {
+                    match m {
+                        Ok(m) => InterfaceResult::Message(m),
+                        Err(RecvError::Lagged(u)) => InterfaceResult::MessagesLagged(u),
+                        Err(RecvError::Closed) => InterfaceResult::ChannelClose,
+                    }
+                }
+            };
+            // conn.send();
         }
     }
+}
+
+enum InterfaceResult {
+    Event(Event),
+    Message(ApprovedChatMessage),
+    MessagesLagged(u64),
+    ChannelClose,
 }
 
 #[derive(Debug)]

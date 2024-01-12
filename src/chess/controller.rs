@@ -16,7 +16,7 @@ use std::{
     collections::{BTreeSet, HashMap},
     error::Error,
     fmt::Display,
-    sync::Arc,
+    sync::{Arc, Weak},
     time::Duration,
 };
 use tokio::{
@@ -35,14 +35,14 @@ pub struct GameControllerInterface {
 }
 // TODO: Convert a lot of the UserInfo parts to include Targets for transmission
 impl GameControllerInterface {
-    pub fn new(word_list: WordList, db_tx: mpsc::Sender<DatabaseMessage>) -> Arc<Self> {
+    pub async fn new(word_list: WordList, db_tx: mpsc::Sender<DatabaseMessage>) -> Arc<Self> {
         let matchmaker = Matchmaker::new();
         Matchmaker::start(matchmaker.clone());
 
         let lobby_manager = RwLock::new(LobbyManager::new());
 
-        Arc::new(Self {
-            matchmaker,
+        let this = Arc::new(Self {
+            matchmaker: matchmaker.clone(),
             lobby_manager,
 
             active_game_codes: RwLock::new(vec![]),
@@ -50,10 +50,15 @@ impl GameControllerInterface {
             word_list: Arc::new(word_list),
 
             db_tx,
-        })
+        });
+
+        let mut writer = matchmaker.controller_ref.write().await;
+        *writer = Arc::downgrade(&this);
+
+        this
     }
 
-    pub async fn join_queue(&self, user: &UserInfo) -> Result<oneshot::Receiver<Option<GameInterface>>, ()> {
+    pub async fn join_queue(&self, user: &UserInfo) -> Result<oneshot::Receiver<Option<Arc<GameInterface>>>, ()> {
         self.matchmaker.join_queue(user).await
     }
     pub async fn leave_queue(&self, user: &UserInfo) {
@@ -61,6 +66,15 @@ impl GameControllerInterface {
     }
 
     pub async fn create_lobby(&self, user: &UserInfo) -> Result<String> {
+        self.create_new_game().await
+    }
+    pub async fn close_lobby(&self) {}
+    pub async fn start_lobby(&self) {}
+
+    pub fn join_lobby(&self) {}
+    pub fn leave_lobby(&self) {}
+
+    async fn create_new_game(&self) -> Result<String> {
         let id = loop {
             let word = self.word_list.combo(&mut OsRng);
 
@@ -86,11 +100,6 @@ impl GameControllerInterface {
 
         Ok(id)
     }
-    pub async fn close_lobby(&self) {}
-    pub async fn start_lobby(&self) {}
-
-    pub fn join_lobby(&self) {}
-    pub fn leave_lobby(&self) {}
 }
 
 #[derive(Debug)]
@@ -151,6 +160,8 @@ impl Lobby {
 struct Matchmaker {
     queue: RwLock<Vec<UserInQueue>>,
     in_queue: RwLock<BTreeSet<UserInfo>>,
+
+    controller_ref: RwLock<Weak<GameControllerInterface>>,
 }
 
 impl Matchmaker {
@@ -158,10 +169,11 @@ impl Matchmaker {
         Arc::new(Self {
             queue: RwLock::new(vec![]),
             in_queue: RwLock::new(BTreeSet::new()),
+            controller_ref: RwLock::new(Weak::new()),
         })
     }
 
-    async fn join_queue(&self, user: &UserInfo) -> Result<oneshot::Receiver<Option<GameInterface>>, ()> {
+    async fn join_queue(&self, user: &UserInfo) -> Result<oneshot::Receiver<Option<Arc<GameInterface>>>, ()> {
         let mut in_queue = self.in_queue.write().await;
         let mut queue = self.queue.write().await;
 
@@ -231,7 +243,9 @@ impl Matchmaker {
             // Create game
             let game = InactiveGame::new(player1_interface, actions, GameConfig::default());
 
-            // TODO: Create game interface
+            // Get controller
+
+            // Create game interfaces
             let p1_msg = game.messenger.channel();
             let player1_game_interface =
                 GameInterface::new(p1_move_rx, action_rx.clone(), p1_event_rx, p1_msg.0, p1_msg.1);
@@ -253,13 +267,13 @@ struct UserInQueue {
     rating: u16,        // Currently not used
     timestamp: Instant, // Currently not used
 
-    reply_to: oneshot::Sender<Option<GameInterface>>,
+    reply_to: oneshot::Sender<Option<Arc<GameInterface>>>,
     // Stats can go here to help with matchmaking, if necessary
     // stats: STUFF
 }
 
 impl UserInQueue {
-    fn new(user: &UserInfo, reply_to: oneshot::Sender<Option<GameInterface>>) -> Self {
+    fn new(user: &UserInfo, reply_to: oneshot::Sender<Option<Arc<GameInterface>>>) -> Self {
         let now = Instant::now();
         Self {
             user: user.clone(),
@@ -268,11 +282,11 @@ impl UserInQueue {
             reply_to,
         }
     }
-    fn create(user: &UserInfo) -> (Self, oneshot::Receiver<Option<GameInterface>>) {
+    fn create(user: &UserInfo) -> (Self, oneshot::Receiver<Option<Arc<GameInterface>>>) {
         let (reply_to, reply_rx) = oneshot::channel();
         (Self::new(user, reply_to), reply_rx)
     }
-    fn reply(self, interface: Option<GameInterface>) {
+    fn reply(self, interface: Option<Arc<GameInterface>>) {
         self.reply_to.send(interface).unwrap();
     }
 }
