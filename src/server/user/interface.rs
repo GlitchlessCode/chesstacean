@@ -1,8 +1,11 @@
 use std::{error::Error, fmt::Display, sync::Arc};
 
-use crate::chess::game::{
-    network::{Action, ApprovedChatMessage, ChatMessage, Event},
-    pieces::Move,
+use crate::{
+    chess::game::{
+        network::{Action, ApprovedChatMessage, ChatMessage, Event},
+        pieces::Move,
+    },
+    server::ws::{GameEvent, SentMessage},
 };
 use tokio::sync::{
     broadcast::{self, error::RecvError},
@@ -89,7 +92,40 @@ impl GameInterface {
                     }
                 }
             };
-            // conn.send();
+
+            match result {
+                InterfaceResult::ChannelClose => (), // TODO: Something here
+                InterfaceResult::Event(event) => {
+                    conn.send(
+                        GameEvent::Event {
+                            code: self.code.clone(),
+                            event,
+                        }
+                        .into(),
+                    )
+                    .await;
+                }
+                InterfaceResult::Message(msg) => {
+                    conn.send(
+                        GameEvent::Message {
+                            code: self.code.clone(),
+                            msg,
+                        }
+                        .into(),
+                    )
+                    .await;
+                }
+                InterfaceResult::MessagesLagged(count) => {
+                    conn.send(
+                        GameEvent::MessagesLagged {
+                            code: self.code.clone(),
+                            count,
+                        }
+                        .into(),
+                    )
+                    .await;
+                }
+            }
         }
     }
 }

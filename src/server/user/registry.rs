@@ -18,11 +18,11 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn new(word_list: WordList, db_tx: &Sender<DatabaseMessage>) -> Arc<Self> {
+    pub async fn new(word_list: WordList, db_tx: &Sender<DatabaseMessage>) -> Arc<Self> {
         Arc::new(Self {
             users: RwLock::new(HashMap::new()),
             active_sessions: RwLock::new(HashSet::new()),
-            controller: GameControllerInterface::new(word_list, db_tx.clone()),
+            controller: GameControllerInterface::new(word_list, db_tx.clone()).await,
         })
     }
 

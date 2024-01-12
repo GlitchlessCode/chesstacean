@@ -12,7 +12,7 @@ use warp::{
 };
 
 use crate::chess::game::{
-    network::{ActionType, ApprovedChatMessage},
+    network::{ActionType, ApprovedChatMessage, Event},
     pieces::Move,
     GameConfig,
 };
@@ -114,6 +114,7 @@ impl SentMessage {
             context: context.to_string(),
         }
     }
+    pub fn event() {}
 }
 
 impl From<ControlEvent> for SentMessage {
@@ -131,7 +132,9 @@ impl From<GameEvent> for SentMessage {
 #[derive(Serialize)]
 pub enum GameEvent {
     GameStart { code: String },
-    Message { msg: ApprovedChatMessage },
+    Event { code: String, event: Event },
+    Message { code: String, msg: ApprovedChatMessage },
+    MessagesLagged { code: String, count: u64 },
 }
 
 #[derive(Serialize)]
@@ -150,6 +153,7 @@ pub enum ControlEvent {
     // * Matchmaking responses
     JoinedQueue,
     LeftQueue,
+    Matched { code: String },
 
     // * Spectators
     JoinedAsSpectator { code: String },

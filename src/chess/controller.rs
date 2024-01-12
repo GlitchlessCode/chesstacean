@@ -6,6 +6,7 @@ use crate::{
     server::{
         database::{Database, DatabaseMessage, DatabaseResult},
         user::{interface::GameInterface, UserInfo},
+        utils::{ArcLock, ArcLockTrait},
     },
     traits::ChooseTake,
     word_loader::WordList,
@@ -13,7 +14,7 @@ use crate::{
 use anyhow::{bail, Result};
 use rand::rngs::OsRng;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     error::Error,
     fmt::Display,
     sync::{Arc, Weak},
@@ -66,9 +67,17 @@ impl GameControllerInterface {
     }
 
     pub async fn create_lobby(&self, user: &UserInfo) -> Result<String> {
-        self.create_new_game().await
+        let code = self.create_new_game().await?;
+
+        let mut lobbies = self.lobby_manager.write().await;
+        lobbies.create_lobby(&user, &code);
+
+        Ok(code)
     }
-    pub async fn close_lobby(&self) {}
+    pub async fn close_lobby(&self, user: &UserInfo, code: String) -> Result<()> {
+        let mut lobbies = self.lobby_manager.write().await;
+        lobbies.close_lobby(user, code)
+    }
     pub async fn start_lobby(&self) {}
 
     pub fn join_lobby(&self) {}
@@ -105,6 +114,9 @@ impl GameControllerInterface {
 #[derive(Debug)]
 pub enum ControllerError {
     InternalError,
+
+    NoSuchLobby,
+    NotLobbyHost,
 }
 
 impl Display for ControllerError {
@@ -114,6 +126,8 @@ impl Display for ControllerError {
             "{}",
             match self {
                 ControllerError::InternalError => format!("InternalError: Ran into an unknown internal error"),
+                ControllerError::NoSuchLobby => format!("NoSuchLobby: The requested lobby does not exist"),
+                ControllerError::NotLobbyHost => format!("NotLobbyHost: You do not own this lobby"),
             }
         )
     }
@@ -122,34 +136,74 @@ impl Display for ControllerError {
 impl Error for ControllerError {}
 
 struct LobbyManager {
-    codes: HashMap<String, Arc<Lobby>>,
-    users: HashMap<UserInfo, Arc<Lobby>>,
+    codes: BTreeMap<String, ArcLock<Lobby>>,
+    users: BTreeMap<UserInfo, Vec<ArcLock<Lobby>>>,
 }
 
 impl LobbyManager {
     fn new() -> Self {
         Self {
-            codes: HashMap::new(),
-            users: HashMap::new(),
+            codes: BTreeMap::new(),
+            users: BTreeMap::new(),
         }
     }
 
-    fn create_lobby(&self, user: &UserInfo) {}
-    fn close_lobby(&self, user: &UserInfo) {}
+    fn create_lobby(&mut self, user: &UserInfo, code: &String) {
+        let lobby = Lobby::new(user.clone());
+        self.codes.insert(code.clone(), Arc::clone(&lobby));
+
+        match self.users.get_mut(user) {
+            None => {
+                self.users.insert(user.clone(), vec![]);
+            }
+            Some(vec) => {
+                vec.push(lobby);
+            }
+        }
+        // self.users.insert(user.clone(), lobby);
+    }
+    async fn close_lobby(&mut self, user: &UserInfo, code: String) -> Result<()> {
+        let lobby = match self.codes.get(&code) {
+            Some(l) => l,
+            None => bail!(ControllerError::NoSuchLobby),
+        };
+        if lobby.read().await.is_host(user) {
+            match self.users.get_mut(user) {
+                None => bail!(ControllerError::NoSuchLobby),
+                Some(vec) => {
+                    let lobby = match self.codes.remove(&code) {
+                        None => bail!(ControllerError::NoSuchLobby),
+                        Some(l) => l.read().await,
+                    };
+                    let i = for (i, l) in vec.iter().enumerate() {
+                        if *(l.read().await) == lobby {
+                            break i;
+                        }
+                        
+                    }
+                    vec.remove(i);
+                }
+            }
+            Ok(())
+        } else {
+            bail!(ControllerError::NotLobbyHost)
+        }
+    }
     fn start_lobby(&self, user: &UserInfo, config: GameConfig) {}
 
     fn join_lobby(&self, user: &UserInfo) {}
     fn leave_lobby(&self, user: &UserInfo) {}
 }
 
+#[derive(PartialEq)]
 struct Lobby {
     host: UserInfo,
     client: Option<UserInfo>,
 }
 
 impl Lobby {
-    fn new(host: UserInfo) -> Arc<Self> {
-        Arc::new(Self { host, client: None })
+    fn new(host: UserInfo) -> ArcLock<Self> {
+        ArcLock::new_arclock(Self { host, client: None })
     }
 
     fn is_host(&self, user: &UserInfo) -> bool {
@@ -211,9 +265,16 @@ impl Matchmaker {
 
             let mut queue = self.queue.write().await;
             let mut in_queue = self.in_queue.write().await;
-            Matchmaker::make_matches(&mut queue, &mut in_queue);
+            let controller = self
+                .controller_ref
+                .read()
+                .await
+                .upgrade()
+                .expect("This should never be None");
+            Matchmaker::make_matches(&mut queue, &mut in_queue, &controller).await;
             drop(queue);
             drop(in_queue);
+            drop(controller);
         }
     }
 
@@ -224,11 +285,27 @@ impl Matchmaker {
     /// Currently does not implement timestamp
     ///
     /// Currently does not implement any statistic analysis
-    fn make_matches(queue: &mut Vec<UserInQueue>, in_queue: &mut BTreeSet<UserInfo>) {
-        while queue.len() > 2 {
+    async fn make_matches(
+        queue: &mut Vec<UserInQueue>,
+        in_queue: &mut BTreeSet<UserInfo>,
+        controller: &Arc<GameControllerInterface>,
+    ) {
+        'while_loop: while queue.len() > 2 {
             // Get random players
             let player1 = queue.take_random(&mut OsRng).unwrap();
             let player2 = queue.take_random(&mut OsRng).unwrap();
+
+            let game_code = controller.create_new_game().await;
+
+            let game_code = match game_code {
+                Ok(gc) => gc,
+                Err(e) => {
+                    eprint!("\rRan into error ({e:?}) creating game code during matchmaking\n\n > ");
+                    player1.reply(None);
+                    player2.reply(None);
+                    continue 'while_loop;
+                }
+            };
 
             in_queue.remove(&player1.user);
             in_queue.remove(&player2.user);
@@ -243,16 +320,21 @@ impl Matchmaker {
             // Create game
             let game = InactiveGame::new(player1_interface, actions, GameConfig::default());
 
-            // Get controller
-
             // Create game interfaces
             let p1_msg = game.messenger.channel();
-            let player1_game_interface =
-                GameInterface::new(p1_move_rx, action_rx.clone(), p1_event_rx, p1_msg.0, p1_msg.1);
+            let player1_game_interface = GameInterface::new(
+                p1_move_rx,
+                action_rx.clone(),
+                p1_event_rx,
+                game_code.clone(),
+                p1_msg.0,
+                p1_msg.1,
+            );
             player1.reply(Some(player1_game_interface));
 
             let p2_msg = game.messenger.channel();
-            let player2_game_interface = GameInterface::new(p2_move_rx, action_rx, p2_event_rx, p2_msg.0, p2_msg.1);
+            let player2_game_interface =
+                GameInterface::new(p2_move_rx, action_rx, p2_event_rx, game_code, p2_msg.0, p2_msg.1);
             player2.reply(Some(player2_game_interface));
 
             // Start game

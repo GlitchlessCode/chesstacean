@@ -21,7 +21,7 @@ async fn main() {
     let (db_tx, db_rx) = mpsc::channel(10);
 
     // Create and start user registry thread
-    let user_registry = Registry::new(words, &db_tx);
+    let user_registry = Registry::new(words, &db_tx).await;
     tokio::task::spawn(Registry::start(user_registry.clone(), ws_rx, token_manager.clone()));
 
     // Create and start database thread, and session flusher

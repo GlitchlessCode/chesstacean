@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     chess::controller::GameControllerInterface,
-    server::ws::{Connection, RecievedMessage, SentMessage},
+    server::ws::{Connection, ControlEvent, RecievedMessage, SentMessage},
 };
 use anyhow::Result;
 use interface::GameInterface;
@@ -31,7 +31,7 @@ pub trait Sender {
     /// ### Serializes the message, and sends it to all connected sessions
     ///
     /// # Panics
-    async fn send(&self, msg: impl Serialize) {
+    async fn send(&self, msg: SentMessage) {
         let msg = match serde_json::to_string(&msg) {
             Ok(msg) => msg,
             Err(e) => {
@@ -225,10 +225,22 @@ impl ConnectionListener {
             RecievedMessage::ControlAction { action } => {
                 use ws::ControlAction::*;
                 let controller = &self.controller;
+                let reader = &self.info.read().await;
                 match action {
                     CreateLobby => {
-                        let reader = &self.info.read().await;
-                        let code = controller.create_lobby(&*reader).await;
+                        let code = controller.create_lobby(&reader).await;
+                        match code {
+                            Ok(code) => self.send(ControlEvent::LobbyCreated { code }.into()).await,
+                            Err(e) => {
+                                eprint!("\rExperienced an error creating a lobby: {e:?}\n\n > ");
+                                self.send(SentMessage::error("Error creating lobby")).await;
+                            }
+                        }
+                    }
+                    CloseLobby { code } => {
+                        if let Err(e) = controller.close_lobby(&reader, code).await {
+                            self.send(SentMessage::error(e)).await;
+                        }
                     }
                     _ => (),
                 }
