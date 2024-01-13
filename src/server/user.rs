@@ -29,8 +29,6 @@ pub trait Sender {
     async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>>;
 
     /// ### Serializes the message, and sends it to all connected sessions
-    ///
-    /// # Panics
     async fn send(&self, msg: SentMessage) {
         let msg = match serde_json::to_string(&msg) {
             Ok(msg) => msg,
@@ -38,9 +36,20 @@ pub trait Sender {
                 return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n\n > ");
             }
         };
+        eprint!("\rSending Message: {msg}\n\n > ");
         for conn in self.connections().await.values() {
             conn.send(msg.clone()).await;
         }
+    }
+}
+
+pub struct ConnectionExtension {
+    connections: ArcLock<HashMap<String, SessionConnections>>,
+}
+
+impl Sender for ConnectionExtension {
+    async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>> {
+        self.connections.read().await
     }
 }
 
@@ -67,9 +76,7 @@ impl UserConnection {
             drop(write_info);
 
             // Update Listener
-            let mut write_info = self.listener.info.write().await;
-            *write_info = user;
-            drop(write_info);
+            self.listener.upgrade(user).await;
 
             Ok(())
         } else {
@@ -132,7 +139,7 @@ impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
 
 struct ConnectionListener {
     connections: ArcLock<HashMap<String, SessionConnections>>,
-    targets: RwLock<HashMap<String, GameInterface>>,
+    targets: Targets,
     controller: Arc<GameControllerInterface>,
     interrupt: mpsc::Sender<()>,
 
@@ -140,6 +147,16 @@ struct ConnectionListener {
 }
 
 impl ConnectionListener {
+    async fn upgrade(&self, user: UserInfo) {
+        let mut write_info = self.info.write().await;
+        let original = write_info.clone();
+        *write_info = user.clone();
+        drop(write_info);
+
+        self.controller.upgrade(original, user.clone()).await;
+        self.targets.upgrade(user).await;
+    }
+
     async fn listen(self: Arc<Self>, mut interrupt: mpsc::Receiver<()>) {
         loop {
             let mut futures = JoinSet::new();
@@ -208,7 +225,7 @@ impl ConnectionListener {
     ) -> Self {
         Self {
             connections,
-            targets: RwLock::new(HashMap::new()),
+            targets: Targets::new(),
             interrupt,
             controller,
             info: RwLock::new(info.clone()),
@@ -228,12 +245,12 @@ impl ConnectionListener {
                 let reader = &self.info.read().await;
                 match action {
                     CreateLobby => {
-                        let code = controller.create_lobby(&reader).await;
+                        let code = controller.create_lobby(&reader, (&self.connections).into()).await;
                         match code {
                             Ok(code) => self.send(ControlEvent::LobbyCreated { code }.into()).await,
                             Err(e) => {
                                 eprint!("\rExperienced an error creating a lobby: {e:?}\n\n > ");
-                                self.send(SentMessage::error("Error creating lobby")).await;
+                                self.send(SentMessage::error(e)).await;
                             }
                         }
                     }
@@ -242,7 +259,29 @@ impl ConnectionListener {
                             self.send(SentMessage::error(e)).await;
                         }
                     }
-                    _ => (),
+                    StartLobby { config } => (),
+
+                    JoinLobby { code } => {
+                        let result = controller.join_lobby(&code, &reader, (&self.connections).into()).await;
+                        if let Err(e) = result {
+                            self.send(SentMessage::error(e)).await;
+                        } else {
+                            self.send(ControlEvent::JoinedLobby { code }.into()).await;
+                        }
+                    }
+                    LeaveLobby { code } => {
+                        let result = controller.leave_lobby(&code, &reader).await;
+                        if let Err(e) = result {
+                            self.send(SentMessage::error(e)).await;
+                        } else {
+                            self.send(ControlEvent::LeftLobby { code }.into()).await;
+                        }
+                    }
+
+                    JoinQueue => (),
+                    LeaveQueue => (),
+
+                    JoinAsSpectator { code } => (),
                 }
             }
             RecievedMessage::GameAction { action } => {
@@ -260,6 +299,28 @@ impl Sender for ConnectionListener {
     async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>> {
         self.connections.read().await
     }
+}
+
+impl From<&ArcLock<HashMap<String, SessionConnections>>> for ConnectionExtension {
+    fn from(value: &ArcLock<HashMap<String, SessionConnections>>) -> Self {
+        Self {
+            connections: value.clone(),
+        }
+    }
+}
+
+struct Targets {
+    inner: RwLock<HashMap<String, GameInterface>>,
+}
+
+impl Targets {
+    fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
+    async fn upgrade(&self, user: UserInfo) {}
 }
 
 enum ListenerResult {

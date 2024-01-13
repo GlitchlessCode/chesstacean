@@ -5,8 +5,9 @@ use super::game::{
 use crate::{
     server::{
         database::{Database, DatabaseMessage, DatabaseResult},
-        user::{interface::GameInterface, UserInfo},
+        user::{interface::GameInterface, ConnectionExtension, Sender, UserInfo},
         utils::{ArcLock, ArcLockTrait},
+        ws::ControlEvent,
     },
     traits::ChooseTake,
     word_loader::WordList,
@@ -66,22 +67,26 @@ impl GameControllerInterface {
         self.matchmaker.leave_queue(user).await
     }
 
-    pub async fn create_lobby(&self, user: &UserInfo) -> Result<String> {
+    pub async fn create_lobby(&self, user: &UserInfo, user_conn: ConnectionExtension) -> Result<String> {
         let code = self.create_new_game().await?;
 
         let mut lobbies = self.lobby_manager.write().await;
-        lobbies.create_lobby(&user, &code);
+        lobbies.create_lobby(&code, &user, user_conn);
 
         Ok(code)
     }
     pub async fn close_lobby(&self, user: &UserInfo, code: String) -> Result<()> {
         let mut lobbies = self.lobby_manager.write().await;
-        lobbies.close_lobby(user, code)
+        lobbies.close_lobby(user, code).await
     }
     pub async fn start_lobby(&self) {}
 
-    pub fn join_lobby(&self) {}
-    pub fn leave_lobby(&self) {}
+    pub async fn join_lobby(&self, code: &String, user: &UserInfo, user_conn: ConnectionExtension) -> Result<()> {
+        self.lobby_manager.write().await.join_lobby(code, user, user_conn).await
+    }
+    pub async fn leave_lobby(&self, code: &String, user: &UserInfo) -> Result<()> {
+        self.lobby_manager.read().await.leave_lobby(code, user).await
+    }
 
     async fn create_new_game(&self) -> Result<String> {
         let id = loop {
@@ -93,12 +98,12 @@ impl GameControllerInterface {
                 DatabaseMessage::send(func, &self.db_tx).await?
             };
 
-            let valid = match result {
+            let already_exists = match result {
                 DatabaseResult::ResultBool(rb) => rb?,
                 _ => bail!(ControllerError::InternalError),
             };
 
-            if valid {
+            if !already_exists {
                 break word;
             }
         };
@@ -109,6 +114,11 @@ impl GameControllerInterface {
 
         Ok(id)
     }
+
+    pub async fn upgrade(&self, original: UserInfo, user: UserInfo) {
+        self.matchmaker.upgrade(original.clone(), user.clone()).await;
+        self.lobby_manager.write().await.upgrade(original, user).await;
+    }
 }
 
 #[derive(Debug)]
@@ -117,6 +127,9 @@ pub enum ControllerError {
 
     NoSuchLobby,
     NotLobbyHost,
+    IsAlreadyHost,
+    FullLobby,
+    NotInLobby,
 }
 
 impl Display for ControllerError {
@@ -125,9 +138,12 @@ impl Display for ControllerError {
             f,
             "{}",
             match self {
-                ControllerError::InternalError => format!("InternalError: Ran into an unknown internal error"),
-                ControllerError::NoSuchLobby => format!("NoSuchLobby: The requested lobby does not exist"),
-                ControllerError::NotLobbyHost => format!("NotLobbyHost: You do not own this lobby"),
+                Self::InternalError => format!("InternalError: Ran into an unknown internal error"),
+                Self::NoSuchLobby => format!("NoSuchLobby: The requested lobby does not exist"),
+                Self::NotLobbyHost => format!("NotLobbyHost: You do not own this lobby"),
+                Self::IsAlreadyHost => format!("IsAlreadyHost: You cannot join a game with yourself"),
+                Self::FullLobby => format!("FullLobby: This lobby is already full"),
+                Self::NotInLobby => format!("NotInLobby: You are not in this lobby"),
             }
         )
     }
@@ -148,19 +164,20 @@ impl LobbyManager {
         }
     }
 
-    fn create_lobby(&mut self, user: &UserInfo, code: &String) {
-        let lobby = Lobby::new(user.clone());
+    async fn upgrade(&mut self, original: UserInfo, user: UserInfo) {}
+
+    fn create_lobby(&mut self, code: &String, user: &UserInfo, user_conn: ConnectionExtension) {
+        let lobby = Lobby::new(code.clone(), user.clone(), user_conn);
         self.codes.insert(code.clone(), Arc::clone(&lobby));
 
         match self.users.get_mut(user) {
             None => {
-                self.users.insert(user.clone(), vec![]);
+                self.users.insert(user.clone(), vec![lobby]);
             }
             Some(vec) => {
                 vec.push(lobby);
             }
         }
-        // self.users.insert(user.clone(), lobby);
     }
     async fn close_lobby(&mut self, user: &UserInfo, code: String) -> Result<()> {
         let lobby = match self.codes.get(&code) {
@@ -173,15 +190,20 @@ impl LobbyManager {
                 Some(vec) => {
                     let lobby = match self.codes.remove(&code) {
                         None => bail!(ControllerError::NoSuchLobby),
-                        Some(l) => l.read().await,
+                        Some(l) => l,
                     };
-                    let i = for (i, l) in vec.iter().enumerate() {
-                        if *(l.read().await) == lobby {
-                            break i;
+                    let mut vec_iter = vec.iter().enumerate();
+                    loop {
+                        if let Some((i, l)) = vec_iter.next() {
+                            if *(l.read().await.code) == *(lobby.read().await.code) {
+                                vec.remove(i);
+                                lobby.read().await.alert_close().await;
+                                break;
+                            }
+                        } else {
+                            break;
                         }
-                        
                     }
-                    vec.remove(i);
                 }
             }
             Ok(())
@@ -189,26 +211,112 @@ impl LobbyManager {
             bail!(ControllerError::NotLobbyHost)
         }
     }
-    fn start_lobby(&self, user: &UserInfo, config: GameConfig) {}
+    fn start_lobby(&mut self, user: &UserInfo, config: GameConfig) {
+        // TODO
+    }
 
-    fn join_lobby(&self, user: &UserInfo) {}
-    fn leave_lobby(&self, user: &UserInfo) {}
+    async fn join_lobby(&mut self, code: &String, user: &UserInfo, user_conn: ConnectionExtension) -> Result<()> {
+        let lobby = match self.codes.get(code) {
+            Some(l) => l,
+            None => bail!(ControllerError::NoSuchLobby),
+        };
+        let mut writer = lobby.write().await;
+        if writer.is_host(user) {
+            bail!(ControllerError::IsAlreadyHost)
+        } else {
+            writer.join(user.clone(), user_conn)?;
+            Ok(())
+        }
+    }
+    async fn leave_lobby(&self, code: &String, user: &UserInfo) -> Result<()> {
+        let lobby = match self.codes.get(code) {
+            Some(l) => l,
+            None => bail!(ControllerError::NoSuchLobby),
+        };
+        lobby.write().await.leave(user)
+    }
 }
 
-#[derive(PartialEq)]
 struct Lobby {
-    host: UserInfo,
-    client: Option<UserInfo>,
+    host: LobbyUser,
+    client: Option<LobbyUser>,
+    code: String,
 }
 
 impl Lobby {
-    fn new(host: UserInfo) -> ArcLock<Self> {
-        ArcLock::new_arclock(Self { host, client: None })
+    fn new(code: String, host_info: UserInfo, host: ConnectionExtension) -> ArcLock<Self> {
+        ArcLock::new_arclock(Self {
+            code,
+            host: LobbyUser {
+                info: host_info,
+                conn: host,
+            },
+            client: None,
+        })
     }
 
     fn is_host(&self, user: &UserInfo) -> bool {
-        &self.host == user
+        &self.host.info == user
     }
+
+    fn is_client(&self, user: &UserInfo) -> bool {
+        if self.client.is_some() {
+            &self.client.as_ref().unwrap().info == user
+        } else {
+            false
+        }
+    }
+
+    fn join(&mut self, client_info: UserInfo, client: ConnectionExtension) -> Result<()> {
+        if self.client.is_some() {
+            bail!(ControllerError::FullLobby)
+        }
+        self.client = Some(LobbyUser {
+            info: client_info,
+            conn: client,
+        });
+        Ok(())
+    }
+
+    fn leave(&mut self, client_info: &UserInfo) -> Result<()> {
+        if self.is_client(client_info) {
+            self.client = None;
+            Ok(())
+        } else {
+            bail!(ControllerError::NotInLobby)
+        }
+    }
+
+    async fn alert_close(&self) {
+        self.host
+            .conn
+            .send(
+                ControlEvent::LobbyClosed {
+                    code: self.code.clone(),
+                }
+                .into(),
+            )
+            .await;
+
+        if self.client.is_some() {
+            self.client
+                .as_ref()
+                .unwrap()
+                .conn
+                .send(
+                    ControlEvent::LobbyClosed {
+                        code: self.code.clone(),
+                    }
+                    .into(),
+                )
+                .await;
+        }
+    }
+}
+
+struct LobbyUser {
+    info: UserInfo,
+    conn: ConnectionExtension,
 }
 
 struct Matchmaker {
@@ -226,6 +334,8 @@ impl Matchmaker {
             controller_ref: RwLock::new(Weak::new()),
         })
     }
+
+    async fn upgrade(&self, original: UserInfo, user: UserInfo) {}
 
     async fn join_queue(&self, user: &UserInfo) -> Result<oneshot::Receiver<Option<Arc<GameInterface>>>, ()> {
         let mut in_queue = self.in_queue.write().await;

@@ -31,9 +31,7 @@ class ConnectionManager extends EventEmitter {
   constructor() {
     super();
     this.#url = new URL(location.toString());
-    this.#connection = new WebSocket(
-      `${to_ws(this.#url)}//${this.#url.host}/ws/connect`
-    );
+    this.#connection = new WebSocket(`${to_ws(this.#url)}//${this.#url.host}/ws/connect`);
     this.#connection.addEventListener("message", (message_event) => {
       this.#handle(message_event);
     });
@@ -99,6 +97,10 @@ class ConnectionManager extends EventEmitter {
     } catch (error) {
       return Err(new MessageError(400, "Bad Request", error.toString()));
     }
+  }
+
+  test(msg) {
+    this.#connection.send(msg);
   }
 }
 
