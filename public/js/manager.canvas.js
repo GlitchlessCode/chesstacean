@@ -58,7 +58,7 @@ canvas.image = function(image, x, y, width, height) {
 
 canvas.square = function(x, y, width, height) {
 	this.ctx.strokeStyle = "#FF582F";
-	this.ctx.lineWidth = 5;
+	this.ctx.lineWidth = 5 * board.tilesize / 90;
 
 	this.ctx.beginPath();
 	this.ctx.rect(x, y, width, height);
@@ -67,7 +67,7 @@ canvas.square = function(x, y, width, height) {
 
 canvas.circle = function(x, y, width, height) {
 	this.ctx.strokeStyle = "#FF582F";
-	this.ctx.lineWidth   = 5;
+	this.ctx.lineWidth   = 5 * board.tilesize / 90;
 
 	this.ctx.beginPath();
 	this.ctx.ellipse(x, y, width / 2, height / 2, 0, 0, Math.PI * 2);

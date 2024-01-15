@@ -1,11 +1,19 @@
 "use strict";
 
+let firstRender   = true;
+
+/** @type {Piece | false} */
+let tileSelected = false;
+
 function getCurrentTile(mouseX, mouseY) {
 	const rect = canvas.cnv.getBoundingClientRect();
 
+    const scaleX = canvas.cnv.width  / rect.width;
+    const scaleY = canvas.cnv.height / rect.height;
+
 	const mouse = {
-		x: mouseX - rect.left,
-		y: mouseY - rect.top,
+		x: (mouseX - rect.left) * scaleX,
+		y: (mouseY - rect.top ) * scaleY,
 	};
 
 	for (let row = 0; row < board.rows.length; row++) {
@@ -36,15 +44,35 @@ function getCurrentTile(mouseX, mouseY) {
 canvas.cnv.addEventListener("mousedown", e => {
 	const [tile, row, col] = getCurrentTile(e.clientX, e.clientY);
 
+	if (tileSelected) {
+		if (tile.mark !== Tile.marks.none) {
+			if ((tileSelected.piece.isWhite) && (row === 0) && (tileSelected.piece.constructor.name === Pawn.name)) {
+				tile.piece = new Queen(true);
+				tileSelected.piece = undefined;
+			} else if ((!tileSelected.piece.isWhite) && (row === board.rows.length - 1) && (tileSelected.piece.constructor.name === Pawn.name)) {
+				tile.piece = new Queen(false);
+				tileSelected.piece = undefined;
+			} else {
+				tile.piece = tileSelected.piece;
+				tileSelected.piece = undefined;
+			}
+		}
+
+		board.unmarkTiles();
+		return;
+	}
+
 	board.unmarkTiles();
 
 	// tile is undefined if user clicked outside of board
 	if (tile === undefined)
 		return;
 
-	// piec is undefined if user clicked on an empty tile
+	// piece is undefined if user clicked on an empty tile
 	if (tile.piece === undefined)
 		return;
+
+	tileSelected = tile;
 
 	tile.piece.markTiles(row, col);
 
@@ -84,6 +112,11 @@ canvas.cnv.addEventListener("mousedown", e => {
 });
 
 canvas.cnv.addEventListener("mousemove", e => {
+	if (firstRender) {
+		requestAnimationFrame(update);
+		firstRender = false;
+	}
+
 	if (!canvas.dragging)
 		return;
 

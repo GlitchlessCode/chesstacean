@@ -1,6 +1,6 @@
 "use strict";
 
-const DEFAULT_FEN         = "rnbqkbnr/pppppppp/8/3QR3/8/8/PPPPPPPP/RNBQKBNR";
+const DEFAULT_FEN         = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 const DEFAULT_GRID_WIDTH  = 8;
 const DEFAULT_GRID_HEIGHT = 8;
 
@@ -28,6 +28,8 @@ board.gridheight     = DEFAULT_GRID_HEIGHT;
 board.playingAsWhite = true;
 
 board.unmarkTiles = function() {
+	tileSelected = false;
+
 	board.rows.forEach(row => {
 		row.forEach(tile => {
 			tile.mark = Tile.marks.none;

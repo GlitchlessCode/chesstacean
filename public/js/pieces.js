@@ -29,7 +29,23 @@ class Piece {
 }
 
 // Returns true if should break iteration
-function markTile(row, col) {
+function markTile(row, col, allowCaptures=true) {
+	if (row < 0 || row >= board.rows.length)
+		return;
+
+	if (col < 0 || col >= board.rows[row].length)
+		return;
+
+	if (!allowCaptures) {
+		const tile = board.rows[row][col];
+
+		if (tile.piece === undefined) {
+			tile.mark = Tile.marks.available;
+		}
+
+		return;
+	}
+
 	const tile = board.rows[row][col];
 
 	if (tile.piece === undefined) {
@@ -113,7 +129,18 @@ class Rook extends Piece {
 }
 
 class Knight extends Piece {
-	markTiles(row, col) {}
+	markTiles(row, col) {
+		[
+			[-2, -1],
+			[-2, 1],
+			[-1, -2],
+			[-1, 2],
+			[1, -2],
+			[1, 2],
+			[2, -1],
+			[2, 1],
+		].forEach(position => markTile(row + position[0], col + position[1]));
+	}
 
 	constructor(isWhite) {
 		super(isWhite);
@@ -154,7 +181,22 @@ class Queen extends Piece {
 }
 
 class King extends Piece {
-	markTiles(row, col) {}
+	markTiles(row, col) {
+		[
+			[-1, -1],
+			[-1, 0],
+			[-1, 1],
+			[0, -1],
+			[0, 1],
+			[1, -1],
+			[1, 0],
+			[1, 1],
+		].forEach(position => {
+			const r = row + position[0];
+			const c = col + position[1];
+			markTile(r, c);
+		});
+	}
 
 	constructor(isWhite) {
 		super(isWhite);
@@ -164,7 +206,36 @@ class King extends Piece {
 }
 
 class Pawn extends Piece {
-	markTiles(row, col) {}
+	markTiles(row, col) {
+		// directly ahead
+
+		markTile(row - 1, col, false);
+
+		// two ahead
+
+		// *keep in mind that rows start at 0, not at 1
+		if ((this.isWhite && row === board.rows.length - 2) || (!this.isWhite && row === 1)) {
+			markTile(row - 2, col, false);
+		}
+
+		// diagonal capture
+
+		let tile, c;
+		const r = this.isWhite ? row - 1 : row + 1;
+
+		c    = col - 1;
+		tile = board.rows[r][c];
+
+		if (tile.piece !== undefined)
+			markTile(r, c);
+
+		c    = col + 1;
+		tile = board.rows[r][c];
+
+		if (tile.piece !== undefined)
+			markTile(r, c);
+
+	}
 
 	constructor(isWhite) {
 		super(isWhite);

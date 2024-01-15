@@ -2,7 +2,6 @@
 
 let maxOffsetX = 0;
 let maxOffsetY = 0;
-let firstRender = true;
 
 function update() {
 	canvas.clear();
@@ -136,7 +135,7 @@ function update() {
 					size,
 				);
 			} else if (tile.mark === Tile.marks.available) {
-				const size = 25;
+				const size = 25 * board.tilesize / 90;
 
 				canvas.circle(
 					tile.left + board.tilesize / 2,
@@ -189,9 +188,5 @@ function update() {
 		canvas.text(label, letteringX, letteringY);
 	}
 
-	// in case images didn't load properly
-	if (firstRender) {
-		firstRender = false;
-		setTimeout(() => requestAnimationFrame(update), 250);
-	}
+	setTimeout(() => requestAnimationFrame(update), 1000);
 }
