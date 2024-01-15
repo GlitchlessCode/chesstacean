@@ -1,4 +1,5 @@
 import EventEmitter from "./ca.chesstacean.event.js";
+import { Message } from "./ca.chesstacean.message.js";
 import { Result, Ok, Err } from "./ca.chesstacean.result.js";
 import { Token, serialize, deserialize } from "./ca.chesstacean.serde_json.js";
 
@@ -31,7 +32,9 @@ class ConnectionManager extends EventEmitter {
   constructor() {
     super();
     this.#url = new URL(location.toString());
-    this.#connection = new WebSocket(`${to_ws(this.#url)}//${this.#url.host}/ws/connect`);
+    this.#connection = new WebSocket(
+      `${to_ws(this.#url)}//${this.#url.host}/ws/connect`
+    );
     this.#connection.addEventListener("message", (message_event) => {
       this.#handle(message_event);
     });
@@ -76,11 +79,10 @@ class ConnectionManager extends EventEmitter {
   }
 
   /**
-   * @param {Object} ser
-   * @param {()=>Result<Token[], Error>} ser.serialize
+   * @param {string} message
    * @returns {Result<null, MessageError>}
    */
-  #send(ser) {
+  #send(message) {
     if (!this.ready)
       return Err(
         new MessageError(
@@ -91,7 +93,6 @@ class ConnectionManager extends EventEmitter {
       );
 
     try {
-      const message = serialize(ser).unwrap();
       this.#connection.send(message);
       return Ok(null);
     } catch (error) {
@@ -99,8 +100,15 @@ class ConnectionManager extends EventEmitter {
     }
   }
 
-  test(msg) {
-    this.#connection.send(msg);
+  create_lobby() {
+    /**
+     * @param {import('./ca.chesstacean.message.js').Message} event
+     */
+    const fn = (event) => {
+      if (event.kind == Message) {
+      }
+    };
+    self.on("message", fn);
   }
 }
 

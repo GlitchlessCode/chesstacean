@@ -3,6 +3,9 @@
 import pieces from "./pieces.js";
 import { Coordinate } from "./components.js";
 
+import { ConnectionManager } from "./modules/ca.chesstacean.network.js";
+window.ConnectionManager = ConnectionManager;
+
 // canvas setup
 
 /** @type {HTMLCanvasElement} */

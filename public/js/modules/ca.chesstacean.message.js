@@ -25,7 +25,8 @@ class Types {
 
   static verify = {
     [this.String]: function (maybe_str) {
-      if (typeof maybe_str == "string") return Ok(maybe_str.replace('\\"', '"'));
+      if (typeof maybe_str == "string")
+        return Ok(maybe_str.replace('\\"', '"'));
       return Err(new TypeError("Captured value is not of type string"));
     },
     [this.Number]: function (maybe_num) {
@@ -66,7 +67,7 @@ class Definition {
   /**
    * @template {Definition} F
    * @param {F} other
-   * @returns {With<this, F>}
+   * @returns {With<F>}
    */
   with(other) {
     other = this.#verify(other);
@@ -76,7 +77,7 @@ class Definition {
   /**
    * @template {symbol} F
    * @param {F} other
-   * @returns {Capture<this, F>}
+   * @returns {Capture}
    */
   capture(other) {
     return new Capture(this, other);
@@ -85,7 +86,7 @@ class Definition {
   /**
    * @template {symbol} F
    * @param {F} other
-   * @returns {Optional<this, F>}
+   * @returns {Optional}
    */
   capture_optional(other) {
     return new Optional(this, other);
@@ -133,7 +134,8 @@ class Named extends Definition {
   extract(tokens) {
     const idx = tokens.findIndex((t) => t.name == this.#name);
 
-    if (idx == -1) return Err(new ParseError(`Named property '${this.#name}' missing`));
+    if (idx == -1)
+      return Err(new ParseError(`Named property '${this.#name}' missing`));
 
     const [content] = tokens[idx];
     return Ok({ name: this.#name, content });
@@ -171,7 +173,9 @@ class And extends Definition {
     if (this.count !== tokens.length) {
       return Err(new ParseError("Incorrect Token Count", ...errs));
     } else if (errs.length !== 0) {
-      return Err(new ParseError("Error encountered in required branch", ...errs));
+      return Err(
+        new ParseError("Error encountered in required branch", ...errs)
+      );
     }
 
     const output = [];
@@ -217,7 +221,9 @@ class Xor extends Definition {
     const result = results.filter((r) => r.is_ok());
 
     if (result.length > 1)
-      return Err(new ParseError("More than one possibility encountered in xor", ...errs));
+      return Err(
+        new ParseError("More than one possibility encountered in xor", ...errs)
+      );
 
     result
       .map((r) => r.unwrap())
@@ -230,19 +236,19 @@ class Xor extends Definition {
 }
 
 /**
- * @template {Named} T
  * @template {Definition} U
  */
 class With extends Definition {
   #self;
   #other;
   /**
-   * @param {T} self
+   * @param {Named} self
    * @param {U} other
    */
   constructor(self, other) {
     super();
-    if (!(self instanceof Named)) throw new TypeError("self must be of type Named");
+    if (!(self instanceof Named))
+      throw new TypeError("self must be of type Named");
     this.#self = self;
     this.#other = other;
   }
@@ -267,26 +273,25 @@ class With extends Definition {
 
     const result = this.#other.match(token.content);
     if (result.is_err())
-      return Err(new ParseError("Could not parse sub-tokens", result.unwrap_err()));
+      return Err(
+        new ParseError("Could not parse sub-tokens", result.unwrap_err())
+      );
 
     return Ok({ [token.name]: result.unwrap() });
   }
 }
 
-/**
- * @template {Named} T
- * @template {symbol} C
- */
 class Capture extends Definition {
   #self;
   #type;
   /**
-   * @param {T} self
-   * @param {C} type
+   * @param {Named} self
+   * @param {symbol} type
    */
   constructor(self, type) {
     super();
-    if (!(self instanceof Named)) throw new TypeError("self must be of type Named");
+    if (!(self instanceof Named))
+      throw new TypeError("self must be of type Named");
     this.#self = self;
     this.#type = type;
   }
@@ -322,20 +327,17 @@ class Capture extends Definition {
   }
 }
 
-/**
- * @template {Named} T
- * @template {symbol} C
- */
 class Optional extends Definition {
   #self;
   #type;
   /**
-   * @param {T} self
-   * @param {C} type
+   * @param {Named} self
+   * @param {symbol} type
    */
   constructor(self, type) {
     super();
-    if (!(self instanceof Named)) throw new TypeError("self must be of type Named");
+    if (!(self instanceof Named))
+      throw new TypeError("self must be of type Named");
     this.#self = self;
     this.#type = type;
   }
@@ -382,13 +384,34 @@ function define(name) {
 }
 
 const context = define("context").with(
-  define("message").capture(Types.String).and(define("affects").capture(Types.String))
+  define("message")
+    .capture(Types.String)
+    .and(define("affects").capture(Types.String))
 );
 
 const error = define("Error").with(context);
+const code = define("code").capture(Types.String);
 
-const wserror = define("WsError").with(define("context").capture_optional(Types.String));
-const wsconnected = define("WsConnected").with(define("display").capture(Types.String));
+const wserror = define("WsError").with(
+  define("context").capture_optional(Types.String)
+);
+const wsconnected = define("WsConnected").with(
+  define("display").capture(Types.String)
+);
+const wsevent = define("WsEvent").with(
+  define("event").with(
+    define("LobbyCreated")
+      .with(code)
+      .xor(define("LobbyClosed").with(code))
+      .xor(define("JoinedLobby").with(code))
+      .xor(define("LeftLobby").with(code))
+      .xor(define("LobbyStarted").with(code))
+      .xor(define("JoinedQueue"))
+      .xor(define("LeftQueue"))
+      .xor(define("Matched").with(code))
+      .xor(define("JoinedAsSpectator").with(code))
+  )
+);
 
 class Status {
   static Success = Symbol("Success");
@@ -435,12 +458,13 @@ class Status {
 }
 
 class Message {
-  static DEFINITIONS = error.xor(wserror).xor(wsconnected);
+  static DEFINITIONS = error.xor(wserror).xor(wsconnected).xor(wsevent);
 
   static Error = Symbol("Error");
 
   static WsError = Symbol("WsError");
   static WsConnected = Symbol("WsConnected");
+  static WsEvent = Symbol("WsEvent");
 
   static from(match) {
     switch (Object.keys(match)[0]) {
@@ -458,6 +482,10 @@ class Message {
         const self = new this(this.WsConnected);
         self.body.display = match.WsConnected.display;
         return self;
+      }
+      case "WsEvent": {
+        const self = new this(this.WsEvent);
+        self.body.event = match.WsEvent.event;
       }
     }
   }

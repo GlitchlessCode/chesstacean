@@ -259,7 +259,7 @@ impl ConnectionListener {
                             self.send(SentMessage::error(e)).await;
                         }
                     }
-                    StartLobby { config } => (),
+                    StartLobby { config } => {}
 
                     JoinLobby { code } => {
                         let result = controller.join_lobby(&code, &reader, (&self.connections).into()).await;
