@@ -16,23 +16,23 @@ use rusqlite::{config::DbConfig, params, Connection, Row};
 use sha2::{Digest, Sha512};
 use std::{error::Error, fmt::Display, fs, net::SocketAddr, sync::Arc};
 use tokio::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{Receiver, Sender},
     time::{self, Duration},
 };
 
 pub mod auth;
+pub mod games;
 pub mod sessions;
 
 use auth::Auth;
+use games::Games;
 use sessions::Sessions;
 
 pub fn init(
+    rx: Receiver<DatabaseMessage>,
+    tx: &Sender<DatabaseMessage>,
     registry: Arc<Registry>,
-) -> (
-    impl Future<Output = ()>,
-    Sender<DatabaseMessage>,
-    impl Future<Output = ()>,
-) {
+) -> (impl Future<Output = ()>, impl Future<Output = ()>) {
     let path = "./db/";
 
     fs::create_dir_all(path.to_owned()).expect(&format!("Failed to open or create directory at {path}"));
@@ -42,9 +42,7 @@ pub fn init(
 
     let database = Database::new(conn);
 
-    let (tx, rx) = mpsc::channel(10);
-
-    (database.start(rx), tx.clone(), flusher(tx, registry))
+    (database.start(rx), flusher(tx.clone(), registry))
 }
 
 pub struct Database {
@@ -79,6 +77,10 @@ impl Database {
         Auth::new(&self.conn, Argon2::default())
     }
 
+    pub fn games<'a>(&'a self) -> Games<'a> {
+        Games::new(&self.conn)
+    }
+
     pub fn flush(&self, timestamp: u64) -> Result<Vec<String>> {
         let mut stmnt = self
             .conn
@@ -89,7 +91,7 @@ impl Database {
             .query_map(params![timestamp], |row| row.get(0))?
             .filter(|r: &Result<String, rusqlite::Error>| {
                 if !r.is_ok() {
-                    eprint!("\rProblem unwrapping cookie\n > ")
+                    eprint!("\rProblem unwrapping cookie\n\n > ")
                 };
                 r.is_ok()
             })
@@ -121,7 +123,7 @@ async fn flusher(tx: Sender<DatabaseMessage>, registry: Arc<Registry>) {
             let string_vec = match result {
                 Ok(DatabaseResult::FlushResult(Ok(sv))) => sv,
                 _ => {
-                    eprint!("\rSession flush failed at {timestamp}\n > ");
+                    eprint!("\rSession flush failed at {timestamp}\n\n > ");
                     break 'inner;
                 }
             };
@@ -233,7 +235,7 @@ impl DatabaseMessage {
         let result = (self.func)(database);
         match self.result.send(result) {
             Ok(_) => (),
-            Err(_) => eprint!("\x1b[1;31mFailed to return Database result to source\x1b[0m\n > "),
+            Err(_) => eprint!("\x1b[1;31mFailed to return Database result to source\x1b[0m\n\n > "),
         }
     }
 

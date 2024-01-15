@@ -194,7 +194,7 @@ async fn log_in(
     };
 
     if let UserInfo::User { .. } = user_info {
-        return Ok(error_message("Cannot log in while in an active session", Affects::Null));
+        return Ok(error_message("Cannot log in while in an active session", None));
     }
 
     let Login { handle, password } = data;
@@ -222,7 +222,7 @@ async fn log_in(
             if !ok {
                 return Ok(error_message(
                     "ValidationError: Username or password is not valid",
-                    Affects::Null,
+                    None,
                 ));
             }
         }
@@ -242,7 +242,7 @@ async fn log_out(
     };
 
     if let UserInfo::Guest { .. } = user_info {
-        return Ok(error_message("Cannot log out of guest session", Affects::Null));
+        return Ok(error_message("Cannot log out of guest session", None));
     }
 
     let func = move |db: &Database| DatabaseResult::from(db.sessions().end_session(&cookie));
@@ -277,20 +277,17 @@ async fn sign_up(
     };
 
     if let UserInfo::User { .. } = user_info {
-        return Ok(error_message(
-            "Cannot sign up while in an active session",
-            Affects::Null,
-        ));
+        return Ok(error_message("Cannot sign up while in an active session", None));
     }
 
     if let Err(e) = validate_handle(&data.handle) {
-        return Ok(error_message(format!("{e}"), Affects::Handle));
+        return Ok(error_message(format!("{e}"), Some(Affects::Handle)));
     }
     if let Err(e) = validate_display(&data.display) {
-        return Ok(error_message(format!("{e}"), Affects::Display));
+        return Ok(error_message(format!("{e}"), Some(Affects::Display)));
     }
     if let Err(e) = validate_password(&data.password) {
-        return Ok(error_message(format!("{e}"), Affects::Password));
+        return Ok(error_message(format!("{e}"), Some(Affects::Password)));
     }
 
     let SignUp {
@@ -323,7 +320,10 @@ async fn sign_up(
         }
         Ok(ok) => {
             if !ok {
-                return Ok(error_message("UniquenessError: Handle must be unique", Affects::Handle));
+                return Ok(error_message(
+                    "UniquenessError: Handle must be unique",
+                    Some(Affects::Handle),
+                ));
             }
         }
     }
@@ -374,7 +374,7 @@ struct Login {
     password: String,
 }
 
-fn error_message(msg: impl ToString, affects: Affects) -> Response<String> {
+fn error_message(msg: impl ToString, affects: Option<Affects>) -> Response<String> {
     let ser = serde_json::to_string(&Message::Error {
         message: msg.to_string(),
         affects,
@@ -388,7 +388,6 @@ fn error_message(msg: impl ToString, affects: Affects) -> Response<String> {
 
 #[derive(Serialize)]
 enum Affects {
-    Null,
     Handle,
     Display,
     Password,

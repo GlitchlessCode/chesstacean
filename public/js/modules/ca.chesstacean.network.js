@@ -98,6 +98,10 @@ class ConnectionManager extends EventEmitter {
       return Err(new MessageError(400, "Bad Request", error.toString()));
     }
   }
+
+  test(msg) {
+    this.#connection.send(msg);
+  }
 }
 
 /**

@@ -1,11 +1,14 @@
 use super::*;
-use crate::server::{tokens::TokenManager, ws::SentMessage};
+use crate::{
+    server::{database::DatabaseMessage, tokens::TokenManager, ws::SentMessage},
+    word_loader::WordList,
+};
 use futures_util::StreamExt;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub struct Registry {
     pub users: RwLock<HashMap<String, UserConnection>>,
@@ -15,11 +18,11 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn new() -> Arc<Self> {
+    pub async fn new(word_list: WordList, db_tx: &Sender<DatabaseMessage>) -> Arc<Self> {
         Arc::new(Self {
             users: RwLock::new(HashMap::new()),
             active_sessions: RwLock::new(HashSet::new()),
-            controller: GameControllerInterface::new(),
+            controller: GameControllerInterface::new(word_list, db_tx.clone()).await,
         })
     }
 
@@ -73,7 +76,7 @@ impl Registry {
 
             if let Ok(string) = msg.unwrap().to_str() {
                 let parse = token_man.parse_ws_token(string.to_string());
-                eprint!("\r{parse:?}\n > ");
+                eprint!("\r{parse:?}\n\n > ");
 
                 if let Ok(parse) = parse {
                     if !parse.valid() {

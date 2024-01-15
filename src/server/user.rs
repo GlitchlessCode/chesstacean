@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     chess::controller::GameControllerInterface,
-    server::ws::{Connection, RecievedMessage, SentMessage},
+    server::ws::{Connection, ControlEvent, RecievedMessage, SentMessage},
 };
 use anyhow::Result;
 use interface::GameInterface;
@@ -29,18 +29,27 @@ pub trait Sender {
     async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>>;
 
     /// ### Serializes the message, and sends it to all connected sessions
-    ///
-    /// # Panics
-    async fn send(&self, msg: impl Serialize) {
+    async fn send(&self, msg: SentMessage) {
         let msg = match serde_json::to_string(&msg) {
             Ok(msg) => msg,
             Err(e) => {
-                return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n > ");
+                return eprint!("\rCould not serialize message when sending to sockets with error: {e}\n\n > ");
             }
         };
+        eprint!("\rSending Message: {msg}\n\n > ");
         for conn in self.connections().await.values() {
             conn.send(msg.clone()).await;
         }
+    }
+}
+
+pub struct ConnectionExtension {
+    connections: ArcLock<HashMap<String, SessionConnections>>,
+}
+
+impl Sender for ConnectionExtension {
+    async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>> {
+        self.connections.read().await
     }
 }
 
@@ -59,8 +68,16 @@ impl UserConnection {
     pub async fn upgrade(&self, handle: impl ToString, display: impl ToString) -> Result<(), ()> {
         let read_info = self.info.read().await;
         if let UserInfo::Guest { .. } = *read_info {
+            let user = UserInfo::new_user(handle, display);
+
+            // Update Connection
             let mut write_info = self.info.write().await;
-            *write_info = UserInfo::new_user(handle, display);
+            *write_info = user.clone();
+            drop(write_info);
+
+            // Update Listener
+            self.listener.upgrade(user).await;
+
             Ok(())
         } else {
             Err(())
@@ -104,7 +121,12 @@ impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
     fn from((value, controller): (UserInfo, Arc<GameControllerInterface>)) -> Self {
         let (tx, rx) = mpsc::channel(2);
         let connections = ArcLock::new_arclock(HashMap::new());
-        let listener = Arc::new(ConnectionListener::new(Arc::clone(&connections), tx, controller));
+        let listener = Arc::new(ConnectionListener::new(
+            Arc::clone(&connections),
+            tx,
+            controller,
+            &value.clone(),
+        ));
         let this = Self {
             info: RwLock::new(value),
             connections,
@@ -117,12 +139,24 @@ impl From<(UserInfo, Arc<GameControllerInterface>)> for UserConnection {
 
 struct ConnectionListener {
     connections: ArcLock<HashMap<String, SessionConnections>>,
-    targets: RwLock<HashMap<String, GameInterface>>,
+    targets: Targets,
     controller: Arc<GameControllerInterface>,
     interrupt: mpsc::Sender<()>,
+
+    info: RwLock<UserInfo>,
 }
 
 impl ConnectionListener {
+    async fn upgrade(&self, user: UserInfo) {
+        let mut write_info = self.info.write().await;
+        let original = write_info.clone();
+        *write_info = user.clone();
+        drop(write_info);
+
+        self.controller.upgrade(original, user.clone()).await;
+        self.targets.upgrade(user).await;
+    }
+
     async fn listen(self: Arc<Self>, mut interrupt: mpsc::Receiver<()>) {
         loop {
             let mut futures = JoinSet::new();
@@ -155,17 +189,18 @@ impl ConnectionListener {
                         drop(hash_map)
                     }
                     ws::ListenerResult::Error(err) => {
-                        eprint!("\rNew Error: {err}\n > ");
+                        eprint!("\rNew Error: {err}\n\n > ");
                         self.send(SentMessage::error(
                             "The server experienced an error handling your request",
                         ))
                         .await;
                     }
                     ws::ListenerResult::Text(msg) => {
-                        eprint!("\rNew Message: {msg:?}\n > ");
+                        eprint!("\rNew Message: {msg:?}\n\n > ");
                         let result = serde_json::from_str::<'_, RecievedMessage>(&msg);
                         match result {
-                            Err(_) => {
+                            Err(err) => {
+                                eprint!("\rError deserializing request: {err}\n\n > ");
                                 self.send(SentMessage::error(
                                     "The server experienced an error handling your request",
                                 ))
@@ -186,12 +221,14 @@ impl ConnectionListener {
         connections: ArcLock<HashMap<String, SessionConnections>>,
         interrupt: mpsc::Sender<()>,
         controller: Arc<GameControllerInterface>,
+        info: &UserInfo,
     ) -> Self {
         Self {
             connections,
-            targets: RwLock::new(HashMap::new()),
+            targets: Targets::new(),
             interrupt,
             controller,
+            info: RwLock::new(info.clone()),
         }
     }
 
@@ -202,8 +239,58 @@ impl ConnectionListener {
 
     async fn handle_message(self: Arc<Self>, action: RecievedMessage) {
         match action {
-            RecievedMessage::ControlAction { action } => (),
-            RecievedMessage::GameAction { action } => (),
+            RecievedMessage::ControlAction { action } => {
+                use ws::ControlAction::*;
+                let controller = &self.controller;
+                let reader = &self.info.read().await;
+                match action {
+                    CreateLobby => {
+                        let code = controller.create_lobby(&reader, (&self.connections).into()).await;
+                        match code {
+                            Ok(code) => self.send(ControlEvent::LobbyCreated { code }.into()).await,
+                            Err(e) => {
+                                eprint!("\rExperienced an error creating a lobby: {e:?}\n\n > ");
+                                self.send(SentMessage::error(e)).await;
+                            }
+                        }
+                    }
+                    CloseLobby { code } => {
+                        if let Err(e) = controller.close_lobby(&reader, code).await {
+                            self.send(SentMessage::error(e)).await;
+                        }
+                    }
+                    StartLobby { config } => (),
+
+                    JoinLobby { code } => {
+                        let result = controller.join_lobby(&code, &reader, (&self.connections).into()).await;
+                        if let Err(e) = result {
+                            self.send(SentMessage::error(e)).await;
+                        } else {
+                            self.send(ControlEvent::JoinedLobby { code }.into()).await;
+                        }
+                    }
+                    LeaveLobby { code } => {
+                        let result = controller.leave_lobby(&code, &reader).await;
+                        if let Err(e) = result {
+                            self.send(SentMessage::error(e)).await;
+                        } else {
+                            self.send(ControlEvent::LeftLobby { code }.into()).await;
+                        }
+                    }
+
+                    JoinQueue => (),
+                    LeaveQueue => (),
+
+                    JoinAsSpectator { code } => (),
+                }
+            }
+            RecievedMessage::GameAction { action } => {
+                use ws::GameAction::*;
+                match action {
+                    Turn { .. } => {}
+                    _ => (),
+                }
+            }
         }
     }
 }
@@ -212,6 +299,28 @@ impl Sender for ConnectionListener {
     async fn connections(&self) -> tokio::sync::RwLockReadGuard<'_, HashMap<String, SessionConnections>> {
         self.connections.read().await
     }
+}
+
+impl From<&ArcLock<HashMap<String, SessionConnections>>> for ConnectionExtension {
+    fn from(value: &ArcLock<HashMap<String, SessionConnections>>) -> Self {
+        Self {
+            connections: value.clone(),
+        }
+    }
+}
+
+struct Targets {
+    inner: RwLock<HashMap<String, GameInterface>>,
+}
+
+impl Targets {
+    fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
+    async fn upgrade(&self, user: UserInfo) {}
 }
 
 enum ListenerResult {
@@ -244,7 +353,7 @@ impl SessionConnections {
                 if let Some(conn) = Arc::into_inner(conn) {
                     conn.close()
                         .await
-                        .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n > "));
+                        .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n\n > "));
                 }
                 return true;
             }
@@ -256,7 +365,7 @@ impl SessionConnections {
             if let Some(conn) = Arc::into_inner(conn) {
                 conn.close()
                     .await
-                    .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n > "));
+                    .unwrap_or_else(|_| eprint!("\rCould not close connection, encountered error\n\n > "));
             }
         }
     }
