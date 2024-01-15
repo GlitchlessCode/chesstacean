@@ -3,9 +3,6 @@
 import pieces from "./pieces.js";
 import { Coordinate } from "./components.js";
 
-import { ConnectionManager } from "./modules/ca.chesstacean.network.js";
-window.ConnectionManager = ConnectionManager;
-
 // canvas setup
 
 /** @type {HTMLCanvasElement} */
@@ -175,7 +172,10 @@ function update() {
     new Coordinate(board.left, board.bottom)
   );
 
-  drawLine(new Coordinate(board.left, board.top), new Coordinate(board.right, board.top));
+  drawLine(
+    new Coordinate(board.left, board.top),
+    new Coordinate(board.right, board.top)
+  );
 
   drawLine(
     new Coordinate(board.right, board.top),
