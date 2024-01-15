@@ -105,3 +105,12 @@ div.side-window > input:focus {
 	border-bottom-color: var(--color-accent);
 	color: var(--color-accent);
 }
+
+div.side-window > p {
+	color: white;
+	width: 100%;
+	font-family: var(--font-family);
+	font-size: 1rem;
+	box-sizing: border-box;
+	padding: 0 32px;
+}

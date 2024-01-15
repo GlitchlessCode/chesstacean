@@ -8,3 +8,8 @@ window.addEventListener("resize", () => {
 });
 
 window.dispatchEvent(new Event("resize"));
+
+window.addEventListener("keydown", e => {
+	if (e.ctrlKey && e.code === "Space")
+		board.reversePov = !board.reversePov;
+});

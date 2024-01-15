@@ -10,6 +10,7 @@
  * @property {(text: string, x: number, y: number, font: string, align: string, baseline: string) => undefined} text
  * @property {() => undefined} clear
  * @property {(image: CanvasImageSource, x: number, y: number, width: number, height: number) => undefined} image
+ * @property {(x: number, y: number, width: number, height: number) => undefined} square
  */
 
 /** @type {Canvas} */
@@ -36,10 +37,10 @@ canvas.line = function(first, final, width) {
 	this.ctx.stroke();
 };
 
-canvas.rect = function(point, width, height) {
+canvas.rect = function(x, y, width, height) {
 	this.ctx.fillStyle = "#101010";
 
-	this.ctx.rect(point.x, point.y, width, height);
+	this.ctx.rect(x, y, width, height);
 	this.ctx.fill();
 };
 
@@ -54,3 +55,21 @@ canvas.clear = function() {
 canvas.image = function(image, x, y, width, height) {
 	this.ctx.drawImage(image, x, y, width, height);
 };
+
+canvas.square = function(x, y, width, height) {
+	this.ctx.strokeStyle = "#FF582F";
+	this.ctx.lineWidth = 5;
+
+	this.ctx.beginPath();
+	this.ctx.rect(x, y, width, height);
+	this.ctx.stroke();
+}
+
+canvas.circle = function(x, y, width, height) {
+	this.ctx.strokeStyle = "#FF582F";
+	this.ctx.lineWidth   = 5;
+
+	this.ctx.beginPath();
+	this.ctx.ellipse(x, y, width / 2, height / 2, 0, 0, Math.PI * 2);
+	this.ctx.stroke();
+}

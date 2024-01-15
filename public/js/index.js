@@ -51,13 +51,22 @@ function update() {
 
 	// draw tiles
 
+	for (let row = 0; row < board.gridheight; row++) {
+		for (let col = 0; col < board.gridwidth; col++) {
+			board.rows[row][col].top    = row * board.tilesize + board.top;
+			board.rows[row][col].left   = col * board.tilesize + board.left;
+			board.rows[row][col].right  = col * board.tilesize + board.tilesize + board.left;
+			board.rows[row][col].bottom = row * board.tilesize + board.tilesize + board.top;
+		}
+	}
+
 	for (let col = 0; col < board.gridheight; col++)
 		// col % 2 is used to checker the board by switching the starting position
 		for (let row = col % 2; row < board.gridwidth; row += 2) {
 			const x = board.left + board.tilesize * row;
 			const y = board.top  + board.tilesize * col;
 
-			canvas.rect(new Point(x, y), board.tilesize, board.tilesize);
+			canvas.rect(x, y, board.tilesize, board.tilesize);
 		}
 
 	const lineWidth = 2 * board.tilesize / 90;
@@ -114,12 +123,33 @@ function update() {
 
 	// draw pieces
 
-	board.rows.forEach((row, rowIndex) => {
-		row.forEach((image, colIndex) => {
-			const x = board.left + colIndex * board.tilesize;
-			const y = board.top  + rowIndex * board.tilesize;
+	board.rows.forEach(row => {
+		row.forEach(tile => {
+			if (tile.mark === Tile.marks.capture) {
+				const size   = board.tilesize / 2;
+				const offset = (board.tilesize - size) / 2;
 
-			canvas.image(image, x, y, board.tilesize, board.tilesize);
+				canvas.square(
+					tile.left + offset,
+					tile.top  + offset,
+					size,
+					size,
+				);
+			} else if (tile.mark === Tile.marks.available) {
+				const size = 25;
+
+				canvas.circle(
+					tile.left + board.tilesize / 2,
+					tile.top  + board.tilesize / 2,
+					size,
+					size,
+				);
+			}
+
+			if (tile.piece == null)
+				return;
+
+			canvas.image(tile.piece.image, tile.left, tile.top, board.tilesize, board.tilesize);
 		});
 	});
 
@@ -162,6 +192,6 @@ function update() {
 	// in case images didn't load properly
 	if (firstRender) {
 		firstRender = false;
-		requestAnimationFrame(update);
+		setTimeout(() => requestAnimationFrame(update), 250);
 	}
 }

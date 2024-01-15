@@ -11,7 +11,7 @@ function openGamePopup() {
 
 	gamePopup.style.removeProperty("overflow-x");
 
-	gamePopup.classList.add("active")
+	gamePopup.classList.add("active");
 
 	setTimeout(() => {
 		nav.style.display  = "none";

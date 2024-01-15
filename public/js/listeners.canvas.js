@@ -1,7 +1,54 @@
 "use strict";
 
-canvas.cnv.addEventListener("click", e => {
-	// click event
+function getCurrentTile(mouseX, mouseY) {
+	const rect = canvas.cnv.getBoundingClientRect();
+
+	const mouse = {
+		x: mouseX - rect.left,
+		y: mouseY - rect.top,
+	};
+
+	for (let row = 0; row < board.rows.length; row++) {
+		for (let col = 0; col < board.rows[row].length; col++) {
+			const tile = board.rows[row][col];
+
+			if (mouse.y < tile.top)
+				continue;
+
+			if (mouse.x < tile.left)
+				continue;
+
+			if (mouse.x > tile.right)
+				continue;
+
+			if (mouse.y > tile.bottom)
+				continue;
+
+			return [tile, row, col];
+		}
+	}
+
+	// outside of board
+
+	return [undefined, undefined, undefined];
+}
+
+canvas.cnv.addEventListener("mousedown", e => {
+	const [tile, row, col] = getCurrentTile(e.clientX, e.clientY);
+
+	board.unmarkTiles();
+
+	// tile is undefined if user clicked outside of board
+	if (tile === undefined)
+		return;
+
+	// piec is undefined if user clicked on an empty tile
+	if (tile.piece === undefined)
+		return;
+
+	tile.piece.markTiles(row, col);
+
+	requestAnimationFrame(update);
 });
 
 // zooming

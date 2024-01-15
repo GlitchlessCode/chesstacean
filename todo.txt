@@ -1,12 +1,8 @@
 
 displaying chat messages
 sending chat messages
-changing site colours using settings
-better notifications popup
-help text
 piece moving
 create functions for opening a game that takes the move history
 create function to update board
-add button to switch pov on board
-add option to remove card
+add button/key to switch pov on board
 remove cards from frontend
