@@ -82,11 +82,36 @@ impl Piece {
         let all_moves: Vec<MoveList> = Vec::new();
         let piece_position: &Position = self.get_position();
 
-        for moveset_list in moveset.moves {
-            let new_position = if moveset.iterative == false {
-                break;
-            };
-        }
+            for moveset_list in moveset.moves {
+                let all_moves_len = all_moves.len();
+                let mut new_head: MoveLink;
+
+
+                loop {
+                    let new_position = self.position.add(moveset_list);
+                    match new_position {
+                        None => break,
+                        Some(pos) => {
+                            if pos.x > 8 || pos.y > 8{
+                                break;
+                            }
+
+                            // head
+                            if all_moves.len() == all_moves_len {
+                               new_head = MoveLink {
+                                    pos: pos,
+                                    next: Arc::new(None),
+                                    prev: Weak::new(),
+                                }
+                            }
+                        }
+                    }
+                    
+                    if moveset.iterative == false {
+                        break;
+                    };
+                }
+            }
         all_moves
     }
 
