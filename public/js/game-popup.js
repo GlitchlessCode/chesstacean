@@ -7,9 +7,11 @@ const gamePopup = document.getElementById("game-popup");
 const transitionTimeMs = 200;
 
 function openGamePopup() {
+	closeAllSideWindows();
+
 	gamePopup.style.removeProperty("overflow-x");
 
-	gamePopup.classList.add("active")
+	gamePopup.classList.add("active");
 
 	setTimeout(() => {
 		nav.style.display  = "none";
@@ -18,6 +20,8 @@ function openGamePopup() {
 }
 
 function closeGamePopup() {
+	closeAllSideWindows();
+
 	nav.style.removeProperty("display");
     main.style.removeProperty("display");
 

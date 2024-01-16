@@ -1,290 +1,192 @@
 "use strict";
 
-import pieces from "./pieces.js";
-import { Coordinate } from "./components.js";
-
-import { ConnectionManager } from "./modules/ca.chesstacean.network.js";
-window.ConnectionManager = ConnectionManager;
-
-// canvas setup
-
-/** @type {HTMLCanvasElement} */
-const cnv = document.getElementById("game-board");
-const ctx = cnv.getContext("2d");
-
-let firstFrame = true;
-
-// board tracking
-
-const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
-
-const gridWidth = 26;
-const gridHeight = 8;
-
-const lineThickness = 2;
-
-// canvas movement
-
-/** @type {{x: number, y: number} | false} */
-let dragging = false;
-
-let zoom = 0;
-
-let cameraX = 0;
-let cameraY = 0;
-
 let maxOffsetX = 0;
 let maxOffsetY = 0;
 
-// zooming
-
-cnv.addEventListener("wheel", (e) => {
-  e.preventDefault();
-
-  // make zooming in faster the more zoomed out you are
-  // and slower the more zoomed in you are
-  const factor = (Math.max(gridWidth, gridHeight) - zoom) / 8;
-
-  zoom -= Math.sign(e.deltaY) * factor;
-  if (zoom < 0) zoom = 0;
-
-  // -2 ensures a minimum number of tiles
-  const max = Math.max(gridWidth, gridHeight) - 2;
-
-  if (zoom > max) zoom = max;
-
-  requestAnimationFrame(update);
-});
-
-// dragging
-
-cnv.addEventListener("mousedown", (e) => {
-  const rect = cnv.getBoundingClientRect();
-
-  dragging = {
-    x: e.clientX - rect.left + cameraX,
-    y: e.clientY - rect.top + cameraY,
-  };
-});
-
-cnv.addEventListener("mousemove", (e) => {
-  if (!dragging) return;
-
-  const rect = cnv.getBoundingClientRect();
-
-  cnv.setAttribute("width", rect.width);
-  cnv.setAttribute("height", rect.height);
-
-  cameraX = dragging.x - (e.clientX - rect.left);
-  cameraY = dragging.y - (e.clientY - rect.top);
-
-  // update frame
-
-  requestAnimationFrame(update);
-});
-
-// stop dragging regardless of if on canvas anymore or not
-addEventListener("mouseup", () => (dragging = false));
-
 function update() {
-  ctx.clearRect(0, 0, cnv.width, cnv.height);
+	canvas.clear();
 
-  const scaledGridWidth = (() => {
-    const scaledGridWidth = gridWidth - zoom;
-    return scaledGridWidth < 0 ? 0 : scaledGridWidth;
-  })();
+	// recalculate tile size
 
-  const scaledGridHeight = (() => {
-    const scaledGridHeight = gridHeight - zoom;
-    return scaledGridHeight < 0 ? 0 : scaledGridHeight;
-  })();
+	board.tilesize = (() => {
+		// adjust grid sizes based on zoom
 
-  // calculate the size of each tile
+		const zoomedGridwidth  = Math.max(board.gridwidth  - camera.z, 0);
+		const zoomedGridheight = Math.max(board.gridheight - camera.z, 0);
 
-  const tileSize = (() => {
-    const tileWidth = cnv.width / scaledGridWidth;
-    const tileHeight = cnv.height / scaledGridHeight;
+		// determine tile sizes based on grid width
 
-    return Math.min(tileWidth, tileHeight);
-  })();
+		const tilewidth  = canvas.width  / zoomedGridwidth;
+		const tileheight = canvas.height / zoomedGridheight;
+
+		return Math.min(tilewidth, tileheight);
+	})();
 
   // calculate the board positions
   // center the grid within the board
 
-  const board = {};
-
-  board.top = (cnv.height - tileSize * gridHeight) / 2;
-  board.left = (cnv.width - tileSize * gridWidth) / 2;
-  board.right = cnv.width - board.left;
-  board.bottom = cnv.height - board.top;
+	board.top    = (canvas.height - board.tilesize * board.gridheight) / 2;
+	board.left   = (canvas.width  - board.tilesize * board.gridwidth)  / 2;
+	board.right  =  canvas.width  - board.left;
+	board.bottom =  canvas.height - board.top;
 
   maxOffsetX = Math.abs(board.left);
   maxOffsetY = Math.abs(board.top);
 
-  // prevent dragging outside of border
+	// prevent dragging outside of border
 
-  let prevCameraX = cameraX;
-  let prevCameraY = cameraY;
-
-  // cap the camera position at the newly calculated max offset
-  if (Math.abs(cameraX) > maxOffsetX) cameraX = Math.sign(cameraX) * maxOffsetX;
-  if (Math.abs(cameraY) > maxOffsetY) cameraY = Math.sign(cameraY) * maxOffsetY;
+	// cap the camera position at the newly calculated max offset
+	if (Math.abs(camera.x) > maxOffsetX)
+		camera.x = Math.sign(camera.x) * maxOffsetX;
+	if (Math.abs(camera.y) > maxOffsetY)
+		camera.y = Math.sign(camera.y) * maxOffsetY;
 
   // offset board positions by camera position
 
-  board.top -= cameraY;
-  board.left -= cameraX;
-  board.right -= cameraX;
-  board.bottom -= cameraY;
+	board.top    -= camera.y;
+	board.left   -= camera.x;
+	board.right  -= camera.x;
+	board.bottom -= camera.y;
 
   // draw tiles
 
-  ctx.fillStyle = "#101010";
+	for (let row = 0; row < board.gridheight; row++) {
+		for (let col = 0; col < board.gridwidth; col++) {
+			board.rows[row][col].top    = row * board.tilesize + board.top;
+			board.rows[row][col].left   = col * board.tilesize + board.left;
+			board.rows[row][col].right  = col * board.tilesize + board.tilesize + board.left;
+			board.rows[row][col].bottom = row * board.tilesize + board.tilesize + board.top;
+		}
+	}
 
-  for (let col = 0; col < gridHeight; col++)
-    // col % 2 is used to checker the board by switching the starting position
-    for (let row = col % 2; row < gridWidth; row += 2) {
-      const x = board.left + tileSize * row;
-      const y = board.top + tileSize * col;
+	for (let col = 0; col < board.gridheight; col++)
+		// col % 2 is used to checker the board by switching the starting position
+		for (let row = col % 2; row < board.gridwidth; row += 2) {
+			const x = board.left + board.tilesize * row;
+			const y = board.top  + board.tilesize * col;
 
-      ctx.rect(x, y, tileSize, tileSize);
-    }
+			canvas.rect(x, y, board.tilesize, board.tilesize);
+		}
 
-  ctx.fill();
+	const lineWidth = 2 * board.tilesize / 90;
 
   // draw vertical lines
 
-  for (let i = 1; i < gridWidth; i++) {
-    const x = board.left + tileSize * i;
+	for (let i = 1; i < board.gridwidth; i++) {
+		const x = board.left + board.tilesize * i;
 
-    drawLine(new Coordinate(x, board.top), new Coordinate(x, board.bottom));
-  }
+		canvas.line(
+			new Point(x, board.top),
+			new Point(x, board.bottom),
+			lineWidth,
+		);
+	}
 
   // draw horizontal lines
 
-  for (let i = 1; i < gridHeight; i++) {
-    const y = board.top + tileSize * i;
+	for (let i = 1; i < board.gridheight; i++) {
+		const y = board.top + board.tilesize * i;
 
-    drawLine(new Coordinate(board.left, y), new Coordinate(board.right, y));
-  }
+		canvas.line(
+			new Point(board.left,  y),
+			new Point(board.right, y),
+			lineWidth,
+		);
+	}
 
   // draw borders
 
-  drawLine(
-    new Coordinate(board.left, board.top),
-    new Coordinate(board.left, board.bottom)
-  );
+	canvas.line(
+		new Point(board.left,  board.top   ),
+		new Point(board.left,  board.bottom),
+		lineWidth,
+	);
 
-  drawLine(
-    new Coordinate(board.left, board.top),
-    new Coordinate(board.right, board.top)
-  );
+	canvas.line(
+		new Point(board.left,  board.top   ),
+		new Point(board.right, board.top   ),
+		lineWidth,
+	);
 
-  drawLine(
-    new Coordinate(board.right, board.top),
-    new Coordinate(board.right, board.bottom)
-  );
+	canvas.line(
+		new Point(board.right, board.top   ),
+		new Point(board.right, board.bottom),
+		lineWidth,
+	);
 
-  drawLine(
-    new Coordinate(board.left, board.bottom),
-    new Coordinate(board.right, board.bottom)
-  );
+	canvas.line(
+		new Point(board.left,  board.bottom),
+		new Point(board.right, board.bottom),
+		lineWidth,
+	);
 
   // draw pieces
 
-  // the pieces don't draw without this timeout until a second frame is called
+	board.rows.forEach(row => {
+		row.forEach(tile => {
+			if (tile.mark === Tile.marks.capture) {
+				const size   = board.tilesize / 2;
+				const offset = (board.tilesize - size) / 2;
 
-  (() => {
-    let row = 0;
-    let col = 0;
+				canvas.square(
+					tile.left + offset,
+					tile.top  + offset,
+					size,
+					size,
+				);
+			} else if (tile.mark === Tile.marks.available) {
+				const size = 25 * board.tilesize / 90;
 
-    Array.from(fen).forEach((character) => {
-      if (character === "/") {
-        row++;
-        col = 0;
+				canvas.circle(
+					tile.left + board.tilesize / 2,
+					tile.top  + board.tilesize / 2,
+					size,
+					size,
+				);
+			}
 
-        return;
-      }
+			if (tile.piece == null)
+				return;
 
-      if (Number.isInteger(+character)) {
-        col += +character;
-        return;
-      }
-
-      const x = board.left + col * tileSize;
-      const y = board.top + row * tileSize;
-
-      ctx.drawImage(pieces[character], x, y, tileSize, tileSize);
-
-      col++;
-    });
-  })();
+			canvas.image(tile.piece.image, tile.left, tile.top, board.tilesize, board.tilesize);
+		});
+	});
 
   // draw numbering and lettering
 
-  const labelMargin = (5 / 60) * tileSize;
-
-  ctx.font = `${(12 / 60) * tileSize}px Inter, sans-serif`;
-  ctx.fillStyle = "#DDDDDD";
+	const font = `${12/60 * board.tilesize}px Inter, sans-serif`;
+	const labelMargin = 5/60 * board.tilesize;
 
   // vertical numbering
 
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
+	canvas.ctx.font      = font;
+	canvas.ctx.fillStyle = "#DDDDDD";
+
+	canvas.ctx.textAlign    = "left";
+	canvas.ctx.textBaseline = "top";
 
   const numberingX = board.left + labelMargin;
 
-  for (let i = 0; i < gridHeight; i++) {
-    const label = gridHeight - i;
-    const numberingY = board.top + tileSize * i + labelMargin;
+	for (let i = 0; i < board.gridheight; i++) {
+		const label      = board.gridheight - i;
+		const numberingY = board.top + board.tilesize * i + labelMargin;
 
-    ctx.fillText(label, numberingX, numberingY);
-  }
+		canvas.text(label, numberingX, numberingY);
+	}
 
   // horizontal numbering
 
-  ctx.textAlign = "right";
-  ctx.textBaseline = "bottom";
+	canvas.ctx.textAlign    = "right";
+	canvas.ctx.textBaseline = "bottom";
 
   const letteringY = board.bottom - labelMargin;
 
-  for (let i = 0; i < gridWidth; i++) {
-    const label = gridWidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
-    const letteringX = board.left + tileSize * (i + 1) - labelMargin;
+	for (let i = 0; i < board.gridwidth; i++) {
+		const label      = board.gridwidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;
+		const letteringX = board.left + board.tilesize * (i + 1) - labelMargin;
 
-    ctx.fillText(label, letteringX, letteringY);
-  }
+		canvas.text(label, letteringX, letteringY);
+	}
 
-  // the piece images dont render on the first frame for some reason,
-  // so re-render the frame if this was the first
-
-  if (firstFrame) {
-    firstFrame = false;
-    requestAnimationFrame(update);
-  }
+	setTimeout(() => requestAnimationFrame(update), 1000);
 }
-
-/**
- * @param {Coordinate} first
- * @param {Coordinate} final
- */
-function drawLine(first, final) {
-  ctx.beginPath();
-  ctx.moveTo(first.x, first.y);
-  ctx.lineTo(final.x, final.y);
-
-  ctx.strokeStyle = "#666666";
-  ctx.lineWidth = lineThickness;
-  ctx.stroke();
-}
-
-cnv.addEventListener("resize", () => {
-  cnv.width = Math.floor(cnv.getBoundingClientRect().width);
-  cnv.height = Math.floor(cnv.getBoundingClientRect().height);
-
-  requestAnimationFrame(update);
-});
-
-cnv.dispatchEvent(new Event("resize"));
-
-requestAnimationFrame(update);

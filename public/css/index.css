@@ -116,6 +116,18 @@ main > div.topleft > div.head > div.left > h1 {
   color: var(--color-foreground);
 }
 
+main > div.topleft > div.head > div.left > h1.guest > a {
+	color: var(--color-accent);
+}
+
+main:not(.loggedin) h1.account {
+	display: none;
+}
+
+main.loggedin h1.guest {
+	display: none;
+}
+
 main > div.topleft > div.head > div.left > div {
   gap: 8px;
   display: flex;
@@ -212,11 +224,6 @@ main > div.bottomleft > div.card-container > div.card {
 
 main > div.bottomleft > div.card-container > div.card:last-child {
   margin-bottom: 64px;
-}
-
-main > div.bottomleft > div.card-container > div.card.inactive div.icon-container,
-main > div.bottomleft > div.card-container > div.card.inactive div.info-container {
-  filter: brightness(50%);
 }
 
 main > div.bottomleft > div.card-container > div.card > div.icon-container {

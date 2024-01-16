@@ -4,19 +4,19 @@ import { Result, Ok, Err } from "./ca.chesstacean.result.js";
 import { Token, serialize, deserialize } from "./ca.chesstacean.serde_json.js";
 
 class MessageError extends Error {
-  /** @type {number} */
-  code;
-  /**
-   * @param {number} code
-   * @param {string} name
-   * @param {string} message
-   */
-  constructor(code, name, message) {
-    super();
-    this.message = message;
-    this.name = `MessageError [${code} ${name}]`;
-    this.code = code;
-  }
+	/** @type {number} */
+	code;
+	/**
+	 * @param {number} code
+	 * @param {string} name
+	 * @param {string} message
+	 */
+	constructor(code, name, message) {
+		super();
+		this.message = message;
+		this.name = `MessageError [${code} ${name}]`;
+		this.code = code;
+	}
 }
 
 class ConnectionManager extends EventEmitter {
