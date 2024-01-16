@@ -218,6 +218,8 @@ pub enum Event {
     YourTurnEnded,
 
     ValidMove(ValidMove),
+
+    Nudge,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -229,4 +231,6 @@ pub enum ActionType {
     AcceptUndo,
 
     Resign,
+
+    Nudge,
 }

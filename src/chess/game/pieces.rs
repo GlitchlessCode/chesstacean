@@ -88,7 +88,7 @@ impl Piece {
 
 
                 loop {
-                    let new_position = self.position.add(moveset_list);
+                    let new_position = self.position.add(moveset_list.clone());
                     match new_position {
                         None => break,
                         Some(pos) => {
@@ -321,6 +321,7 @@ struct FullMoveset {
     iterative: bool,
 }
 
+#[derive(Clone)]
 struct Moveset {
     x_modifier: i16,
     y_modifier: i16,
