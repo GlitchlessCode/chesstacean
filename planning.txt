@@ -11,14 +11,20 @@ Crates (Packages) to use:
   Interface for SQLite RDBMS
 
 Routes:
-/css/...
-/js/...
-/img/...
-/
-/match/:id
+GET: /css/...
+GET: /js/...
+GET: /img/...
+GET: /
+GET: /match/:id
+GET: /login
 
-/ws/token
-/ws/connect
+POST: /auth/login
+POST: /auth/logout
+POST: /auth/signup
+
+
+GET: /ws/token
+GET: /ws/connect
 
 ------------------------
 

@@ -1,24 +1,53 @@
-use chesstacean::server::{self, database, routes, user::registry::Registry, ServerConfig};
-use std::env;
+use chesstacean::{
+    server::{self, database, routes, tokens::TokenManager, user::registry::Registry, ServerConfig},
+    word_loader,
+};
+use std::{env, sync::Arc};
 use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
     eprint!("\x1b[2J");
 
-    let db = database::init();
+    let words = word_loader::load().await;
 
-    let (tx, rx) = mpsc::channel(1);
+    // Create TokenManager
+    let token_manager = Arc::new(TokenManager::new());
 
-    let user_registry = Registry::new();
-    tokio::task::spawn(user_registry.start(rx));
+    // Create mpsc for WebSockets
+    let (ws_tx, ws_rx) = mpsc::channel(10);
 
-    let routes = routes::attach_404(routes::ws_make(routes::page_make(routes::static_make()), tx));
-    // let routes = routes::ws_make(routes::static_make(), tx);
+    // Create mpsc for DB
+    let (db_tx, db_rx) = mpsc::channel(10);
 
+    // Create and start user registry thread
+    let user_registry = Registry::new(words, &db_tx).await;
+    tokio::task::spawn(Registry::start(user_registry.clone(), ws_rx, token_manager.clone()));
+
+    // Create and start database thread, and session flusher
+    let (database, flusher) = database::init(db_rx, &db_tx, user_registry.clone());
+    tokio::task::spawn(database);
+    tokio::task::spawn(flusher);
+
+    // Create routes
+    let routes = routes::attach_404(routes::ws_make(
+        routes::post_make(
+            routes::page_make(routes::static_make(), &db_tx),
+            &db_tx,
+            user_registry.clone(),
+        ),
+        ws_tx,
+        &db_tx,
+        token_manager.clone(),
+        user_registry,
+    ));
+
+    // Read Args
     let mut args = env::args();
+    // Ignore first arg (represents name of program)
     args.next();
 
+    // Create config, and start server using config and routes
     let config = ServerConfig::build(args).unwrap_or(ServerConfig::new([127, 0, 0, 1], 3000, None));
     match config.tls {
         Some(_) => {
@@ -31,5 +60,6 @@ async fn main() {
         }
     }
 
+    // Start console interface, consuming config
     server::console::start(config);
 }

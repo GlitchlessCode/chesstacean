@@ -22,16 +22,16 @@ function update() {
 		return Math.min(tilewidth, tileheight);
 	})();
 
-	// calculate the board positions
-	// center the grid within the board
+  // calculate the board positions
+  // center the grid within the board
 
 	board.top    = (canvas.height - board.tilesize * board.gridheight) / 2;
 	board.left   = (canvas.width  - board.tilesize * board.gridwidth)  / 2;
 	board.right  =  canvas.width  - board.left;
 	board.bottom =  canvas.height - board.top;
 
-	maxOffsetX = Math.abs(board.left);
-	maxOffsetY = Math.abs(board.top);
+  maxOffsetX = Math.abs(board.left);
+  maxOffsetY = Math.abs(board.top);
 
 	// prevent dragging outside of border
 
@@ -41,14 +41,14 @@ function update() {
 	if (Math.abs(camera.y) > maxOffsetY)
 		camera.y = Math.sign(camera.y) * maxOffsetY;
 
-	// offset board positions by camera position
+  // offset board positions by camera position
 
 	board.top    -= camera.y;
 	board.left   -= camera.x;
 	board.right  -= camera.x;
 	board.bottom -= camera.y;
 
-	// draw tiles
+  // draw tiles
 
 	for (let row = 0; row < board.gridheight; row++) {
 		for (let col = 0; col < board.gridwidth; col++) {
@@ -70,7 +70,7 @@ function update() {
 
 	const lineWidth = 2 * board.tilesize / 90;
 
-	// draw vertical lines
+  // draw vertical lines
 
 	for (let i = 1; i < board.gridwidth; i++) {
 		const x = board.left + board.tilesize * i;
@@ -82,7 +82,7 @@ function update() {
 		);
 	}
 
-	// draw horizontal lines
+  // draw horizontal lines
 
 	for (let i = 1; i < board.gridheight; i++) {
 		const y = board.top + board.tilesize * i;
@@ -94,7 +94,7 @@ function update() {
 		);
 	}
 
-	// draw borders
+  // draw borders
 
 	canvas.line(
 		new Point(board.left,  board.top   ),
@@ -120,7 +120,7 @@ function update() {
 		lineWidth,
 	);
 
-	// draw pieces
+  // draw pieces
 
 	board.rows.forEach(row => {
 		row.forEach(tile => {
@@ -152,12 +152,12 @@ function update() {
 		});
 	});
 
-	// draw numbering and lettering
+  // draw numbering and lettering
 
 	const font = `${12/60 * board.tilesize}px Inter, sans-serif`;
 	const labelMargin = 5/60 * board.tilesize;
 
-	// vertical numbering
+  // vertical numbering
 
 	canvas.ctx.font      = font;
 	canvas.ctx.fillStyle = "#DDDDDD";
@@ -165,7 +165,7 @@ function update() {
 	canvas.ctx.textAlign    = "left";
 	canvas.ctx.textBaseline = "top";
 
-	const numberingX = board.left + labelMargin;
+  const numberingX = board.left + labelMargin;
 
 	for (let i = 0; i < board.gridheight; i++) {
 		const label      = board.gridheight - i;
@@ -174,12 +174,12 @@ function update() {
 		canvas.text(label, numberingX, numberingY);
 	}
 
-	// horizontal numbering
+  // horizontal numbering
 
 	canvas.ctx.textAlign    = "right";
 	canvas.ctx.textBaseline = "bottom";
 
-	const letteringY = board.bottom - labelMargin;
+  const letteringY = board.bottom - labelMargin;
 
 	for (let i = 0; i < board.gridwidth; i++) {
 		const label      = board.gridwidth <= 26 ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i] : i + 1;

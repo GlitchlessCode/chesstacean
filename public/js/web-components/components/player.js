@@ -212,4 +212,4 @@ export default class PlayerCardElement extends HTMLElement {
   }
 }
 
-customElements.define("player-card", PlayerCardElement);
+customElements.define("c-player", PlayerCardElement);

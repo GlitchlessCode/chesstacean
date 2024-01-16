@@ -97,4 +97,4 @@ export default class MoveLiElement extends HTMLElement {
   }
 }
 
-customElements.define("move-li", MoveLiElement);
+customElements.define("c-move", MoveLiElement);

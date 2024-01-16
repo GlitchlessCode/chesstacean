@@ -9,7 +9,9 @@ use warp::{filters::ws::WebSocket, http, reject::Rejection, Filter};
 pub mod console;
 pub mod database;
 pub mod routes;
+pub mod tokens;
 pub mod user;
+pub mod utils;
 pub mod ws;
 
 pub fn run_server(

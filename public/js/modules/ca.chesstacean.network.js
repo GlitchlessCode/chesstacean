@@ -1,5 +1,7 @@
 import EventEmitter from "./ca.chesstacean.event.js";
+import { Message } from "./ca.chesstacean.message.js";
 import { Result, Ok, Err } from "./ca.chesstacean.result.js";
+import { Token, serialize, deserialize } from "./ca.chesstacean.serde_json.js";
 
 class MessageError extends Error {
 	/** @type {number} */
@@ -18,86 +20,128 @@ class MessageError extends Error {
 }
 
 class ConnectionManager extends EventEmitter {
-	/** @type {WebSocket} */
-	#connection;
-	/** @type {boolean} */
-	#ready;
-	/**
-	 * @param {URL} url
-	 * @returns {Promise<ConnectionManager>}
-	 */
-	constructor(url) {
-		super();
-		this.#connection = new WebSocket(url);
-		this.#ready = false;
-		// Make a request to /ws/token
-		// Recieve token from server
-		// Send token as message on websocket
-	}
+  /** @type {WebSocket} */
+  #connection;
+  /** @type {boolean} */
+  #ready;
+  /** @type {boolean} */
+  #run;
+  /** @type {URL} */
+  #url;
 
-	get ready() {
-		this.#ready = this.#connection.readyState == 1;
-		return this.#ready;
-	}
+  constructor() {
+    super();
+    this.#url = new URL(location.toString());
+    this.#connection = new WebSocket(
+      `${to_ws(this.#url)}//${this.#url.host}/ws/connect`
+    );
+    this.#connection.addEventListener("message", (message_event) => {
+      this.#handle(message_event);
+    });
 
-	#handle() {}
+    this.#ready = false;
+    this.#run = false;
+  }
 
-	/**
-	 * @param {Object} obj
-	 */
-	#send(obj) {
-		if (!this.ready)
-			return Err(
-				new MessageError(
-					503,
-					"Service Unavailable",
-					"Could not successfully connect to the server!"
-				)
-			);
-		if (!isObject(obj))
-			return Err(
-				new MessageError(
-					400,
-					"Bad Request",
-					`obj was of type ${typeof obj}, must be of type Object`
-				)
-			);
+  async connect() {
+    if (this.#run) throw new Error("This function has already been run");
+    this.#run = true;
 
-		try {
-			const message = JSON.stringify(obj);
+    const token = await (
+      await fetch(`${to_http(this.#url)}//${this.#url.host}/ws/token`)
+    ).text();
 
-			return Ok("Sent!");
-		} catch (error) {
-			return Err(
-				new MessageError(400, "Bad Request", "Could not parse obj into valid JSON")
-			);
-		}
-	}
+    if (!this.ready) {
+      await new Promise((resolve, reject) => {
+        this.#connection.addEventListener(
+          "open",
+          () => {
+            resolve(this);
+          },
+          { once: true }
+        );
+      });
+    }
 
-	offerDraw(gameId) {}
-	acceptDraw(gameId) {}
+    this.#connection.send(token);
+  }
 
-	requestUndo(gameId) {}
-	acceptUndo(gameId) {}
+  get ready() {
+    this.#ready = this.#connection.readyState == 1;
+    return this.#ready && this.#run;
+  }
 
-	resign(gameId) {}
-	nudge(gameId) {}
+  /**
+   * @param {MessageEvent} event
+   */
+  #handle(event) {
+    this.emit("message", deserialize(event.data));
+  }
 
-	sendMove(gameId, move) {}
-	sendChatMessage(gameId, message) {}
+  /**
+   * @param {string} message
+   * @returns {Result<null, MessageError>}
+   */
+  #send(message) {
+    if (!this.ready)
+      return Err(
+        new MessageError(
+          503,
+          "Service Unavailable",
+          "Could not successfully connect to the server!"
+        )
+      );
 
-	spectate(gameId) {}
+    try {
+      this.#connection.send(message);
+      return Ok(null);
+    } catch (error) {
+      return Err(new MessageError(400, "Bad Request", error.toString()));
+    }
+  }
 
-	login(handle, password) {}
-	createAccount(handle, password, displayname) {}
+  create_lobby() {
+    /**
+     * @param {import('./ca.chesstacean.message.js').Message} event
+     */
+    const fn = (event) => {
+      if (event.kind == Message) {
+      }
+    };
+    self.on("message", fn);
+  }
 }
+
+/**
+ * @param {URL} url
+ */
+function to_ws(url) {
+  switch (url.protocol) {
+    case "https:":
+    case "wss:":
+      return "wss:";
+    default:
+      return "ws:";
+  }
+}
+
+function to_http(url) {
+  switch (url.protocol) {
+    case "https:":
+    case "wss:":
+      return "https:";
+    default:
+      return "http:";
+  }
+}
+
 /**
  * @param {any} value
  */
-function isObject(value) {
-	if (value == null || !(typeof value == "object")) return false;
-	if (value.__proto__ !== Object.prototype) return false;
-	return true;
+function is_object(value) {
+  if (value == null || !(typeof value == "object")) return false;
+  if (value.__proto__ !== Object.prototype) return false;
+  return true;
 }
 
 export { ConnectionManager, MessageError };

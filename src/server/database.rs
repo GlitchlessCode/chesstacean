@@ -1,40 +1,48 @@
-use super::user::User;
-use anyhow::Result;
-use rusqlite::{config::DbConfig, params, Connection, Row};
-use std::fs;
+extern crate sha2;
 
-pub fn init() -> Database {
+use super::{
+    user::{registry::Registry, UserInfo},
+    utils::get_timestamp,
+};
+use anyhow::{bail, Result};
+use argon2::{
+    password_hash::{self, rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
+use base64::{engine::general_purpose, Engine};
+use futures_util::Future;
+use rand::{thread_rng, Rng};
+use rusqlite::{config::DbConfig, params, Connection, Row};
+use sha2::{Digest, Sha512};
+use std::{error::Error, fmt::Display, fs, net::SocketAddr, sync::Arc};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    time::{self, Duration},
+};
+
+pub mod auth;
+pub mod games;
+pub mod sessions;
+
+use auth::Auth;
+use games::Games;
+use sessions::Sessions;
+
+pub fn init(
+    rx: Receiver<DatabaseMessage>,
+    tx: &Sender<DatabaseMessage>,
+    registry: Arc<Registry>,
+) -> (impl Future<Output = ()>, impl Future<Output = ()>) {
     let path = "./db/";
 
     fs::create_dir_all(path.to_owned()).expect(&format!("Failed to open or create directory at {path}"));
-    let database = Connection::open(path.to_owned() + "chesstacean.db3")
+    let conn = Connection::open(path.to_owned() + "chesstacean.db3")
         .expect(&format!("Failed to open or create database at {path}chesstacean.db3"));
+    conn.set_prepared_statement_cache_capacity(32);
 
-    Database::new(database)
+    let database = Database::new(conn);
 
-    // let mut stmnt = database
-    //     .prepare("INSERT INTO games(black, white, moves) VALUES (?1, ?2, ?3)")
-    //     .unwrap();
-    // stmnt.execute(rusqlite::params![1, 2, "7,6>7,4;4,1>4,3;"]).unwrap(); // DOES NOT FAIL
-    // match stmnt.execute(rusqlite::params![1, 5, "7,6>7,4;"]) { // FAILS BECAUSE OF FK CONSTRAINT
-    //     Ok(_) => (),
-    //     Err(e) => eprintln!("E: {}", e),
-    // };
-
-    // This was succesfully sanitized
-    // let params = rusqlite::params![
-    //     "glitchlesscode",
-    //     "Timothy",
-    //     "1234",
-    //     "password1234); DROP TABLE users; --",
-    // ];
-
-    // database
-    //     .execute(
-    //         "INSERT INTO users(handle, display, salt, digest) VALUES (?1, ?2, ?3, ?4)",
-    //         params,
-    //     )
-    //     .unwrap();
+    (database.start(rx), flusher(tx.clone(), registry))
 }
 
 pub struct Database {
@@ -54,41 +62,201 @@ impl Database {
         Self { conn: database }
     }
 
-    pub fn sessions<'a>(&'a self) -> Sessions<'a> {
-        Sessions { conn: &self.conn }
+    async fn start(self, mut db_rx: Receiver<DatabaseMessage>) -> () {
+        while let Some(db_msg) = db_rx.recv().await {
+            db_msg.run(&self);
+        }
+        panic!("db_rx mspc channel was closed: this channel should never close");
     }
-}
 
-pub struct Sessions<'a> {
-    conn: &'a Connection,
-}
+    pub fn sessions<'a>(&'a self) -> Sessions<'a> {
+        Sessions::new(&self.conn)
+    }
 
-impl<'a> Sessions<'a> {
-    pub fn validate_session(&self, cookie: &str) -> bool {
+    pub fn auth<'a>(&'a self) -> Auth<'a> {
+        Auth::new(&self.conn, Argon2::default())
+    }
+
+    pub fn games<'a>(&'a self) -> Games<'a> {
+        Games::new(&self.conn)
+    }
+
+    pub fn flush(&self, timestamp: u64) -> Result<Vec<String>> {
         let mut stmnt = self
             .conn
-            .prepare_cached("SELECT invalid FROM sessions WHERE cookie = ?1")
+            .prepare_cached("SELECT cookie FROM sessions WHERE expiry <= ?1 OR invalid = 1")
             .expect("Should be a valid sql statement");
-        let result: Vec<Result<bool, rusqlite::Error>> =
-            match stmnt.query_map(params![cookie], |row| row.get::<usize, bool>(0)) {
-                Ok(mapped) => mapped.collect(),
-                Err(_) => return false,
-            };
 
-        if result.len() != 1 {
-            return false;
-        } else {
-            let value = match result.into_iter().next() {
-                Some(res) => res.expect("Should never be err"),
-                None => return false,
-            };
-            !value
-        }
+        let cookies: Vec<String> = stmnt
+            .query_map(params![timestamp], |row| row.get(0))?
+            .filter(|r: &Result<String, rusqlite::Error>| {
+                if !r.is_ok() {
+                    eprint!("\rProblem unwrapping cookie\n\n > ")
+                };
+                r.is_ok()
+            })
+            .map(|r| r.unwrap())
+            .collect();
+
+        let mut stmnt = self
+            .conn
+            .prepare_cached("DELETE FROM sessions WHERE expiry <= ?1 OR invalid = 1")
+            .expect("Should be a valid sql statement");
+
+        stmnt.execute(params![timestamp])?;
+
+        Ok(cookies)
     }
-    pub fn create_new_session(user: Option<User>) {}
 }
 
-fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
+async fn flusher(tx: Sender<DatabaseMessage>, registry: Arc<Registry>) {
+    let mut interval = time::interval(Duration::from_secs(60));
+    loop {
+        let timestamp = get_timestamp();
+        let result = DatabaseMessage::send(
+            move |db: &Database| DatabaseResult::from(db.flush(timestamp as u64)),
+            &tx,
+        )
+        .await;
+
+        'inner: {
+            let string_vec = match result {
+                Ok(DatabaseResult::FlushResult(Ok(sv))) => sv,
+                _ => {
+                    eprint!("\rSession flush failed at {timestamp}\n\n > ");
+                    break 'inner;
+                }
+            };
+            for session in string_vec {
+                registry.end_session(session).await;
+            }
+        }
+
+        interval.tick().await;
+    }
+}
+
+#[derive(Debug)]
+pub struct SQLError;
+
+impl Display for SQLError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SQLError")
+    }
+}
+
+impl Error for SQLError {}
+
+pub enum DatabaseResult {
+    Bool(bool),
+    String(String),
+    ResultString(Result<String>),
+    ResultBool(Result<bool>),
+    UserInfo(Option<UserInfo>),
+    FlushResult(Result<Vec<String>>),
+}
+
+impl From<bool> for DatabaseResult {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
+}
+
+impl From<String> for DatabaseResult {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for DatabaseResult {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<Result<String>> for DatabaseResult {
+    fn from(value: Result<String>) -> Self {
+        Self::ResultString(value)
+    }
+}
+
+impl From<Result<bool>> for DatabaseResult {
+    fn from(value: Result<bool>) -> Self {
+        Self::ResultBool(value)
+    }
+}
+
+impl From<Option<UserInfo>> for DatabaseResult {
+    fn from(value: Option<UserInfo>) -> Self {
+        Self::UserInfo(value)
+    }
+}
+
+impl From<Result<Vec<String>>> for DatabaseResult {
+    fn from(value: Result<Vec<String>>) -> Self {
+        Self::FlushResult(value)
+    }
+}
+
+impl Display for DatabaseResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Bool(b) => b.to_string(),
+                Self::String(s) => s.to_string(),
+                Self::ResultString(r) => format!("{r:?}"),
+                Self::ResultBool(b) => format!("{b:?}"),
+                Self::UserInfo(ui) => format!("{ui:?}"),
+                Self::FlushResult(sv) => format!("{sv:?}"),
+            }
+        )
+    }
+}
+
+pub struct DatabaseMessage {
+    result: tokio::sync::oneshot::Sender<DatabaseResult>,
+    func: Box<dyn FnOnce(&Database) -> DatabaseResult + Send>,
+}
+
+impl DatabaseMessage {
+    pub fn new(
+        func: impl Fn(&Database) -> DatabaseResult + Send + 'static,
+        tx: tokio::sync::oneshot::Sender<DatabaseResult>,
+    ) -> Self {
+        Self {
+            result: tx,
+            func: Box::new(func),
+        }
+    }
+
+    fn run(self, database: &Database) {
+        let result = (self.func)(database);
+        match self.result.send(result) {
+            Ok(_) => (),
+            Err(_) => eprint!("\x1b[1;31mFailed to return Database result to source\x1b[0m\n\n > "),
+        }
+    }
+
+    pub async fn send(
+        func: impl FnOnce(&Database) -> DatabaseResult + Send + 'static,
+        db_tx: &Sender<DatabaseMessage>,
+    ) -> Result<DatabaseResult> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        db_tx
+            .send(Self {
+                result: tx,
+                func: Box::new(func),
+            })
+            .await
+            .expect("db_tx mspc channel closed: this channel should never close");
+
+        Ok(rx.await?)
+    }
+}
+
+fn create_tables(database: &Connection) -> Result<()> {
     attempt_create(database)?;
     for table in get_tables().iter() {
         verify_table(database, table)?;
@@ -101,14 +269,13 @@ fn create_tables(database: &Connection) -> Result<(), rusqlite::Error> {
 /// Attempts to create tables in sqlite database
 ///
 /// Keep in mind, table definitions are hardcoded values
-fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
+fn attempt_create(database: &Connection) -> Result<()> {
     database.execute(
         "CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY,
         handle TEXT NOT NULL UNIQUE,
         display TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        digest TEXT NOT NULL
+        phc TEXT NOT NULL
    );",
         [],
     )?;
@@ -116,6 +283,7 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
     database.execute(
         "CREATE TABLE IF NOT EXISTS games (
         id INTEGER PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
         black INTEGER NOT NULL,
         white INTEGER NOT NULL,
         moves TEXT,
@@ -130,21 +298,9 @@ fn attempt_create(database: &Connection) -> Result<(), rusqlite::Error> {
             id INTEGER PRIMARY KEY,
             cookie TEXT NOT NULL UNIQUE,
             user INTEGER,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
+            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000) + 14400000),
             invalid INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT fk_user FOREIGN KEY (user) REFERENCES users(id)
-       );",
-        [],
-    )?;
-
-    database.execute(
-        "CREATE TABLE IF NOT EXISTS tokens (
-            id INTEGER PRIMARY KEY,
-            token TEXT NOT NULL UNIQUE,
-            session INTEGER NOT NULL,
-            expiry INTEGER NOT NULL DEFAULT(ROUND((julianday('now') - 2440587.5)*86400000)),
-            invalid INTEGER NOT NULL DEFAULT 0,
-            CONSTRAINT fk_session FOREIGN KEY (session) REFERENCES sessions(id)
        );",
         [],
     )?;
@@ -164,8 +320,7 @@ fn get_tables() -> Vec<TableInfo> {
             ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
             ColumnInfo::default().name("handle").not_null(true),
             ColumnInfo::default().name("display").not_null(true),
-            ColumnInfo::default().name("salt").not_null(true),
-            ColumnInfo::default().name("digest").not_null(true),
+            ColumnInfo::default().name("phc").not_null(true),
         ],
     });
 
@@ -173,6 +328,7 @@ fn get_tables() -> Vec<TableInfo> {
         name: "games".to_owned(),
         columns: vec![
             ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
+            ColumnInfo::default().name("name").kind("TEXT").not_null(true),
             ColumnInfo::default().name("black").kind("INTEGER").not_null(true),
             ColumnInfo::default().name("white").kind("INTEGER").not_null(true),
             ColumnInfo::default().name("moves"),
@@ -189,26 +345,9 @@ fn get_tables() -> Vec<TableInfo> {
                 .name("expiry")
                 .kind("INTEGER")
                 .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
-            ColumnInfo::default()
-                .name("invalid")
-                .kind("INTEGER")
-                .not_null(true)
-                .default_value(Some("0".to_owned())),
-        ],
-    });
-
-    tables.push(TableInfo {
-        name: "tokens".to_owned(),
-        columns: vec![
-            ColumnInfo::default().name("id").kind("INTEGER").primary_key(true),
-            ColumnInfo::default().name("token").not_null(true),
-            ColumnInfo::default().name("session").kind("INTEGER").not_null(true),
-            ColumnInfo::default()
-                .name("expiry")
-                .kind("INTEGER")
-                .not_null(true)
-                .default_value(Some("ROUND((julianday('now') - 2440587.5)*86400000)".to_owned())),
+                .default_value(Some(
+                    "ROUND((julianday('now') - 2440587.5)*86400000) + 14400000".to_owned(),
+                )),
             ColumnInfo::default()
                 .name("invalid")
                 .kind("INTEGER")
