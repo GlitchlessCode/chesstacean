@@ -29,6 +29,7 @@ class Piece {
 }
 
 // Returns true if should break iteration
+// if allowCaptures=false, returns true if there is a piece in that spot
 function markTile(row, col, allowCaptures=true) {
 	if (row < 0 || row > board.rows.length - 1)
 		return;
@@ -43,7 +44,7 @@ function markTile(row, col, allowCaptures=true) {
 			tile.mark = Tile.marks.available;
 		}
 
-		return;
+		return tile.piece === undefined ? false : true;
 	}
 
 	const tile = board.rows[row][col];
@@ -209,14 +210,15 @@ class Pawn extends Piece {
 	markTiles(row, col) {
 		// directly ahead
 
-		markTile(row + (this.isWhite ? -1 : 1), col, false);
+		let pieceThere = markTile(row + (this.isWhite ? -1 : 1), col, false);
 
 		// two ahead
 
-		// *keep in mind that rows start at 0, not at 1
-		if ((this.isWhite && row === board.rows.length - 2) || (!this.isWhite && row === 1)) {
-			markTile(row + (this.isWhite ? -2 : 2), col, false);
-		}
+		if (!pieceThere)
+			// *keep in mind that rows start at 0, not at 1
+			if ((this.isWhite && row === board.rows.length - 2) || (!this.isWhite && row === 1)) {
+				markTile(row + (this.isWhite ? -2 : 2), col, false);
+			}
 
 		// diagonal capture
 
