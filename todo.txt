@@ -1,8 +1,0 @@
-
-displaying chat messages
-sending chat messages
-piece moving
-create functions for opening a game that takes the move history
-create function to update board
-add button/key to switch pov on board
-remove cards from frontend

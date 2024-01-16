@@ -12,6 +12,7 @@
 		<link rel="stylesheet" href="/css/index.css" type="text/css" />
 		<link rel="stylesheet" href="/css/side-window.css" type="text/css" />
 
+		<script src="/js/nudge.js" type="text/javascript" defer></script>
 		<script src="/js/point.js" type="text/javascript" defer></script>
 		<script src="/js/pieces.js" type="text/javascript" defer></script>
 		<script src="/js/game-popup.js" type="text/javascript" defer></script>
@@ -79,7 +80,7 @@
 							<span>[displayname1] vs [displayname2]</span> — active game. Your turn.
 						</div>
 						<button onclick="openGamePopup()"><div>play</div></button>
-						<svg viewBox="0 0 25 25"xmlns="http://www.w3.org/2000/svg">
+						<svg onclick="featureUnavailableError()" viewBox="0 0 25 25"xmlns="http://www.w3.org/2000/svg">
 							<path d="M5.20288 21.4371V4.43713H14.2029L14.6029 6.43713H20.2029V16.4371H13.2029L12.8029 14.4371H7.20288V21.4371H5.20288ZM14.8529 14.4371H18.2029V8.43713H12.9529L12.5529 6.43713H7.20288V12.4371H14.4529L14.8529 14.4371Z" />
 						</svg>
 					</div>
@@ -192,6 +193,7 @@
 				</svg>
 			</div>
 			<p>You are able to zoom in/out and drag on the board.</p>
+			<p>Temp: Use shift+n in order to display the nudge card. This would normally be activated by the other player if you are takign too long to make your move.</p>
 			<p>Notice: Check detection has not yet been implemented.</p>
 		</div>
 	</body>

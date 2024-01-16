@@ -30,10 +30,10 @@ class Piece {
 
 // Returns true if should break iteration
 function markTile(row, col, allowCaptures=true) {
-	if (row < 0 || row >= board.rows.length)
+	if (row < 0 || row > board.rows.length - 1)
 		return;
 
-	if (col < 0 || col >= board.rows[row].length)
+	if (col < 0 || col > board.rows[row].length - 1)
 		return;
 
 	if (!allowCaptures) {
@@ -209,13 +209,13 @@ class Pawn extends Piece {
 	markTiles(row, col) {
 		// directly ahead
 
-		markTile(row - 1, col, false);
+		markTile(row + (this.isWhite ? -1 : 1), col, false);
 
 		// two ahead
 
 		// *keep in mind that rows start at 0, not at 1
 		if ((this.isWhite && row === board.rows.length - 2) || (!this.isWhite && row === 1)) {
-			markTile(row - 2, col, false);
+			markTile(row + (this.isWhite ? -2 : 2), col, false);
 		}
 
 		// diagonal capture
@@ -226,13 +226,13 @@ class Pawn extends Piece {
 		c    = col - 1;
 		tile = board.rows[r][c];
 
-		if (tile.piece !== undefined)
+		if (tile && tile.piece !== undefined)
 			markTile(r, c);
 
 		c    = col + 1;
 		tile = board.rows[r][c];
 
-		if (tile.piece !== undefined)
+		if (tile && tile.piece !== undefined)
 			markTile(r, c);
 
 	}

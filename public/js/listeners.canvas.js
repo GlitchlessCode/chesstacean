@@ -1,6 +1,7 @@
 "use strict";
 
-let firstRender   = true;
+let firstRender        = true;
+let freezePlayerMoving = false;
 
 /** @type {Piece | false} */
 let tileSelected = false;
@@ -41,24 +42,81 @@ function getCurrentTile(mouseX, mouseY) {
 	return [undefined, undefined, undefined];
 }
 
-canvas.cnv.addEventListener("mousedown", e => {
+function runMove(from, to, row) {
+	if ((from.piece.isWhite) && (row === 0) && (from.piece.constructor.name === Pawn.name)) {
+		to.piece   = new Queen(true);
+		from.piece = undefined;
+	} else if ((!from.piece.isWhite) && (row === board.rows.length - 1) && (from.piece.constructor.name === Pawn.name)) {
+		to.piece   = new Queen(false);
+		from.piece = undefined;
+	} else {
+		to.piece   = from.piece;
+		from.piece = undefined;
+	}
+}
+
+canvas.cnv.addEventListener("mousedown", async e => {
+	if (freezePlayerMoving)
+		return;
+
 	const [tile, row, col] = getCurrentTile(e.clientX, e.clientY);
 
 	if (tileSelected) {
 		if (tile.mark !== Tile.marks.none) {
-			if ((tileSelected.piece.isWhite) && (row === 0) && (tileSelected.piece.constructor.name === Pawn.name)) {
-				tile.piece = new Queen(true);
-				tileSelected.piece = undefined;
-			} else if ((!tileSelected.piece.isWhite) && (row === board.rows.length - 1) && (tileSelected.piece.constructor.name === Pawn.name)) {
-				tile.piece = new Queen(false);
-				tileSelected.piece = undefined;
-			} else {
-				tile.piece = tileSelected.piece;
-				tileSelected.piece = undefined;
-			}
+			runMove(tileSelected, tile, row);
+			board.unmarkTiles();
+		} else {
+			board.unmarkTiles();
+			return;
 		}
 
+		// make response move
+		// pretend to be player
+
+		freezePlayerMoving = true;
+		await new Promise(r => setTimeout(r, 500));
+		freezePlayerMoving = false;
+
+		board.playingAsWhite = false;
+
+		const possibleTiles = [];
+		board.rows.forEach((row, rowIndex) => row.forEach((tile, colIndex) => {
+			if (tile.piece && !tile.piece.isWhite)
+				possibleTiles.push({ tile: tile, row: rowIndex, col: colIndex });
+		}));
+
+		while (true) {
+			if (possibleTiles.length === 0) {
+				noPossibleMovesError();
+				break;
+			}
+
+			const selectedTileIndex = Math.floor(Math.random() * possibleTiles.length);
+			let selectedTileInfo = possibleTiles[selectedTileIndex];
+			selectedTileInfo.tile.piece.markTiles(selectedTileInfo.row, selectedTileInfo.col);
+
+			let selectedTile = board.rows[selectedTileInfo.row][selectedTileInfo.col];
+
+			const possibleMoves = [];
+			board.rows.forEach((row, rowIndex) => row.forEach(tile => {
+				if (tile.mark !== Tile.marks.none)
+					possibleMoves.push({ tile: tile, row: rowIndex });
+			}));
+
+			if (possibleMoves.length === 0) {
+				possibleTiles.splice(selectedTileIndex, 1);
+				continue;
+			}
+
+			let selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+			runMove(selectedTile, selectedMove.tile, selectedMove.row);
+
+			break;
+		}
+
+		board.playingAsWhite = true;
 		board.unmarkTiles();
+
 		return;
 	}
 
@@ -70,6 +128,10 @@ canvas.cnv.addEventListener("mousedown", e => {
 
 	// piece is undefined if user clicked on an empty tile
 	if (tile.piece === undefined)
+		return;
+
+	// not your piece
+	if (tile.piece.isWhite !== board.playingAsWhite)
 		return;
 
 	tileSelected = tile;
